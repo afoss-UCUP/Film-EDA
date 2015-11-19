@@ -175,3 +175,23 @@ smp <- data.table('nm' = smp,'V1' = 1)
 smp[,len:=sum(V1),by=nm.V1]
 setkey(smp,len)
 unique(smp)
+
+
+
+
+#################################
+BOMOJO
+#################################
+
+letter_list <- grab_mojo_toc()
+
+cl <- makePSOCKcluster(8,outfile="")
+setDefaultCluster(cl)
+clusterExport(NULL, c('extract_mojo_movie_pages'))
+mojo_links <- parLapply(cl,letter_list,grab_mojo_movies_links)
+stopCluster(cl)
+closeAllConnections()
+gc()
+
+mojo_links <- do.call('c',mojo_links)
+
