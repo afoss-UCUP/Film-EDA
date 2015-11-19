@@ -419,3 +419,69 @@ single_solution <- function(n){
   }
   return(out)
 }
+
+
+
+
+
+##grabs BoxOffice Mojo Movie Table of Contents
+grab_mojo_toc <- function(){
+  library(rvest)
+  library(XML)
+  #unload Hmisc package if loaded due to issues
+  if(sum(search()=='package:Hmisc')>0){
+    detach("package:Hmisc", unload=TRUE)	
+  }
+  
+  test <- try(html_text(read_html("http://www.boxofficemojo.com/movies/")%>%
+                          html_nodes('tr+ tr b a')),silent = TRUE)
+  letter_list <- unique(gsub('\n| ','',test)) 
+  letter_list <- letter_list[-length(letter_list)]
+    
+  return(letter_list)
+}
+
+
+#Extracts movie pages from BoxOffice Mojo hrefs
+extract_mojo_movie_pages <- function(movie_list){
+  elements <- NULL
+  for(tag in movie_list){
+    if(!is.na(pmatch('/movies/?id',tag))){
+      elements <- c(elements,tag)
+    }
+  }
+  return(elements)
+}
+
+
+##grabs BoxOffice Mojo List of links on alphabetical pages 
+grab_mojo_movies_links <- function(letter){
+  library(rvest)
+  library(XML)
+  library(RCurl)
+  #unload Hmisc package if loaded due to issues
+  if(sum(search()=='package:Hmisc')>0){
+    detach("package:Hmisc", unload=TRUE)	
+  }
+  
+  letter <- gsub('#','NUM',letter)
+  base_url <- 'http://www.boxofficemojo.com/'
+  url <- "http://www.boxofficemojo.com/movies/alphabetical.htm?letter="
+  dl_url <- getURL(paste(url,letter,'&p=.htm', sep = ""))
+  
+  sub_pages <- getHTMLLinks(dl_url, xpQuery = 
+                              "//*[@class = 'alpha-nav-holder']//a/@href")
+  sub_pages <- unique(sub_pages)
+  movie_list <- getHTMLLinks(dl_url, xpQuery = "//table//tr//td//a/@href")
+  movie_links <- extract_mojo_movie_pages(movie_list)
+  
+  for(pg in sub_pages){
+    dl_url <- getURL(paste(base_url,pg,sep = ''))
+    movie_list <- getHTMLLinks(dl_url, xpQuery = "//table//tr//td//a/@href")
+    movie_links <- c(movie_links,extract_mojo_movie_pages(movie_list))
+  }
+  
+  return(movie_links)
+}
+
+
