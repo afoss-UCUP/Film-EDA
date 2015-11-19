@@ -192,6 +192,7 @@ grab_rating_dat <- function(name_vector,movie_names){
   library(rvest)
   library(XML)
   library(data.table)
+  library(RCurl)
   #unload Hmisc package if loaded due to issues
   if(sum(search()=='package:Hmisc')>0){
     detach("package:Hmisc", unload=TRUE)	
@@ -203,22 +204,41 @@ grab_rating_dat <- function(name_vector,movie_names){
   tab3 <- NULL
   test <- NULL
   
-  test <- try(read_html(paste("http://www.rottentomatoes.com/m/",as.character(movie_names[,Name][name_vector]),'/#contentReviews',sep="")),silent = TRUE)
-  tab1 <-  try(as.numeric(test %>% html_node("#tomato_meter_link .superPageFontColor span") %>% html_text()),silent = TRUE)
+  tab <- data.table('Name' = NA, 'Critic' = NA, 'Audience' = NA, 'AvgRev' = NA, 'RevCt' = NA)
+  tab$Name <- paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')
+  
+  test <- try(read_html(paste("http://www.rottentomatoes.com/m/",as.character(movie_names[,Name][name_vector]),sep="")),silent = TRUE)
+  tab1 <- try(as.numeric(gsub(" |%","",html_text(xml_find_all(test, ".//*[@id = 'tomato_meter_link']")[1]))),silent = TRUE)
   if(class(tab1)[1]=='try-error'){
-    test <- try(read_html(paste("http://www.rottentomatoes.com/m/",as.character(paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')),'/#contentReviews',sep=""))[2],silent = TRUE)
+    test <- try(read_html(paste("http://www.rottentomatoes.com/m/",as.character(paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')),sep="")),silent = TRUE)
+    tab1 <- try(as.numeric(gsub(" |%","",html_text(xml_find_all(test, ".//*[@id = 'tomato_meter_link']")[1]))),silent = TRUE)
+  }
+  
+  if(class(tab1)[1]=='try-error'){
+    test <- try(read_html(getURL(paste("http://www.rottentomatoes.com/search/?search=",gsub('the+','',gsub('_','+',as.character(paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')))),sep=""), followlocation = T)),silent = TRUE)
+    tab1 <- try(as.numeric(gsub(" |%","",html_text(xml_find_all(test, ".//*[@id = 'tomato_meter_link']")[1]))),silent = TRUE)
   }
   
   
-  if(class(test)[1]!='try-error'){
-    tab1 <-  try(as.numeric(test %>% html_node("#tomato_meter_link .superPageFontColor span") %>% html_text()),silent = TRUE)
-    tab2 <-  try(as.numeric(gsub('%','',test %>% html_node(".meter-value .superPageFontColor") %>% html_text())),silent = TRUE)
-    tab3 <-  try(strsplit(test %>% html_node("#scoreStats") %>% html_text(),':'),silent = TRUE)
+  if(class(tab1)[1]!='try-error'){
+    tab2 <-  try(as.numeric(gsub(" |%","", (html_text(xml_find_all(test, ".//*[@class='meter-value']"))))),silent = TRUE)
+    tab3 <-  try(strsplit(html_text(xml_find_all(test, ".//*[@id='scoreStats']")[1]),':'),silent = TRUE)
     avg_critic <- as.numeric(strsplit(tab3[[1]][2],'/')[[1]][1])
     rev_count <- as.numeric(strsplit(tab3[[1]][3],'   ')[[1]][1])
-    tab <- data.table('Name' = paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_'), 'Critic' = tab1, 'Audience' = tab2, 'AvgRev' = avg_critic, 'RevCt' = rev_count)
+    tab$Critic = tab1
+    if(class(tab2)[1]!='try-error'){
+      if(length(tab2) != 0){
+        tab$Audience = tab2
+      }
+    }
+    if(class(tab3)[1]!='try-error'){
+      tab$AvgRev = avg_critic
+      tab$RevCt = rev_count
+    }
+    
     
   }
+  gc()
   return(tab)
 }
 
