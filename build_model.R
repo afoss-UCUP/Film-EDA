@@ -16,7 +16,7 @@ date_list <- as.Date((Sys.Date()-(365*12)):Sys.Date(),origin = '1970-01-01')
 weekends <- date_list[which(format(date_list,'%A')=='Friday')]
 
 library(snow)#parallelizing package
-cl <- makeSOCKcluster(c("localhost","localhost","localhost","localhost"))#initialized 4 parallel instances
+cl <- makePSOCKcluster(4,outfile="")#initialized 4 parallel instances
 movie_weekends <- parLapply(cl, weekends, grab_movie_dat) #parallelized grab movie funcition to build initial list of dataframes 
 stopCluster(cl)
 gc()
@@ -34,7 +34,7 @@ movie_weekends <- add_current_films(movie_weekends,opening_this_week)
 tickers <- unique(movie_weekends[,Symbol])#generates the ticker list needed for additional HSX data
 
 #builds datatable of expected opening weekends from ticker list
-cl <- makeSOCKcluster(c("localhost","localhost","localhost","localhost"))
+cl <- makePSOCKcluster(c("localhost","localhost","localhost","localhost"),outfile="")
 EOWs <- parLapply(cl,tickers,grab_opening_dat)
 stopCluster(cl)
 EOWs <- rbindlist(EOWs)
@@ -43,7 +43,7 @@ gc()
 merged_movies <- merge(movie_weekends,EOWs,by='Symbol',all.x=TRUE)
 
 #generate genere and rating datatable
-cl <- makeSOCKcluster(c("localhost","localhost","localhost","localhost"))
+cl <- makePSOCKcluster(c("localhost","localhost","localhost","localhost"),outfile="")
 other_hsx_dat <- parLapply(cl,tickers,grab_hsx_dat)
 stopCluster(cl)
 gc()
@@ -51,10 +51,13 @@ gc()
 #add genre and rating data to datatable
 merged_movies <- add_rating_and_genre(other_hsx_dat,merged_movies)
 
+####load('C:/Users/Aaron Foss/Documents/Classes/Udacity/HW4/merged_movies.Rdata')
+merged_movies <- merged_movies[MPAARating%in%c('G','PG','PG13','R'),]
+
 movie_names <- merged_movies[,list('Date' = min(Date)),by=Name]#generate unique list of movie names for generating ratings table
 
 #build datatable of movie ratings
-cl <- makeSOCKcluster(c("localhost","localhost","localhost","localhost"))
+cl <- makePSOCKcluster(c("localhost","localhost","localhost","localhost"),outfile="")
 movie_ratings <- parLapply(cl,c(1:dim(movie_names)[1]),grab_rating_dat,movie_names)
 stopCluster(cl)
 
@@ -83,7 +86,7 @@ setkey(movies_rated,Date)
 #I'm not certain that is true, but have no alternate as of now
 dat <- (movies_rated[!is.na(EstOW)& Week < 10 & Week > 1 ,list(Name,'tgt' = winsor(WeekGross,trim = 0.05),'Week' = as.numeric(Week), 'Week2' = as.numeric(Week)^2, 'Rating' = as.factor(MPAARating),'Month' = as.factor((substr(Date,6,7))),'Genre' = as.factor(Genre),EstOW,OWres,RelOWres,Critic,Audience,AvgRev,RevCt,RelCt,RelCritic,lagRelPerf,RelAudience,lagWeekGross,chgWeekGross,pctChgWeekGross,RelChgWeekGross,RelPctChgWeekGross,lagGRelPerf,gRelAudience,gRelCritic,gRelCt,Date)])
 
-dt <- '2015-10-30'#specifies upcoming friday
+dt <- '2015-11-13'#specifies upcoming friday
 list_of_film_dates <- dat[,list(Name,Date,Week)]
 
 train <- which(list_of_film_dates[,Date]<dt)#build training dataset
