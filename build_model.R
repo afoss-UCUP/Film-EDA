@@ -1,8 +1,8 @@
-setwd("~/Film Performance/")  # set my working directory
+setwd("~/../version-control/Film-EDA")  # set my working directory
 graphics.off() # close charts
 rm(list = ls(all = TRUE))
 
-source('~/Film Performance/assist_functions.R')#loads additional functions
+source(paste(getwd(),'/assist_functions.R', sep = ''))#loads additional functions
 
 ####################################
 #SCRAPE WEBPAGES TO BUILD DATATABLE#
@@ -182,16 +182,25 @@ unique(smp)
 #################################
 BOMOJO
 #################################
+library(parallel)
+library(rvest)
+library(XML)
+library(RCurl)
+
 
 letter_list <- grab_mojo_toc()
 
 cl <- makePSOCKcluster(8,outfile="")
 setDefaultCluster(cl)
-clusterExport(NULL, c('extract_mojo_movie_pages'))
+clusterExport(NULL, c('extract_mojo_movie_pages','build_movie_list'))
 mojo_links <- parLapply(cl,letter_list,grab_mojo_movies_links)
 stopCluster(cl)
 closeAllConnections()
 gc()
 
-mojo_links <- do.call('c',mojo_links)
+mojo_links <- rbindlist(mojo_links)
+mojo_links <- mojo_links[open_date>'2005-11-18'&!is.na(open_date),]
+
+
+new <- grab_mojo_movies_data(mojo_links[1211,filmid])
 
