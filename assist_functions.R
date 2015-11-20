@@ -185,60 +185,7 @@ add_rating_and_genre <- function(other_hsx_dat,merged_movies){
   
 }
 
-#grabs fan and critic data
-grab_rating_dat <- function(name_vector,movie_names){
-  library(rvest)
-  library(XML)
-  library(data.table)
-  library(RCurl)
-  #unload Hmisc package if loaded due to issues
-  if(sum(search()=='package:Hmisc')>0){
-    detach("package:Hmisc", unload=TRUE)	
-  }
-  
-  tab <- NULL
-  tab1 <- NULL
-  tab2 <- NULL
-  tab3 <- NULL
-  test <- NULL
-  
-  tab <- data.table('Name' = NA, 'Critic' = NA, 'Audience' = NA, 'AvgRev' = NA, 'RevCt' = NA)
-  tab$Name <- paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')
-  
-  test <- try(read_html(paste("http://www.rottentomatoes.com/m/",as.character(movie_names[,Name][name_vector]),sep="")),silent = TRUE)
-  tab1 <- try(as.numeric(gsub(" |%","",html_text(xml_find_all(test, ".//*[@id = 'tomato_meter_link']")[1]))),silent = TRUE)
-  if(class(tab1)[1]=='try-error'){
-    test <- try(read_html(paste("http://www.rottentomatoes.com/m/",as.character(paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')),sep="")),silent = TRUE)
-    tab1 <- try(as.numeric(gsub(" |%","",html_text(xml_find_all(test, ".//*[@id = 'tomato_meter_link']")[1]))),silent = TRUE)
-  }
-  
-  if(class(tab1)[1]=='try-error'){
-    test <- try(read_html(getURL(paste("http://www.rottentomatoes.com/search/?search=",gsub('the+','',gsub('_','+',as.character(paste(movie_names[,Name][name_vector],substr(movie_names[,Date][name_vector],1,4),sep='_')))),sep=""), followlocation = T)),silent = TRUE)
-    tab1 <- try(as.numeric(gsub(" |%","",html_text(xml_find_all(test, ".//*[@id = 'tomato_meter_link']")[1]))),silent = TRUE)
-  }
-  
-  
-  if(class(tab1)[1]!='try-error'){
-    tab2 <-  try(as.numeric(gsub(" |%","", (html_text(xml_find_all(test, ".//*[@class='meter-value']"))))),silent = TRUE)
-    tab3 <-  try(strsplit(html_text(xml_find_all(test, ".//*[@id='scoreStats']")[1]),':'),silent = TRUE)
-    avg_critic <- as.numeric(strsplit(tab3[[1]][2],'/')[[1]][1])
-    rev_count <- as.numeric(strsplit(tab3[[1]][3],'   ')[[1]][1])
-    tab$Critic = tab1
-    if(class(tab2)[1]!='try-error'){
-      if(length(tab2) != 0){
-        tab$Audience = tab2
-      }
-    }
-    if(class(tab3)[1]!='try-error'){
-      tab$AvgRev = avg_critic
-      tab$RevCt = rev_count
-    }
-    
-    
-  }
-  gc()
-  return(tab)
-}
+
 
 #adds fan and critic data to datatable
 add_fan_critic_ratings <- function(merged_movies){
@@ -801,6 +748,21 @@ build_week <- function(i,rel,lnks,dys,gro,thea){
   
 }
 
+#writes movie json data to file
+write_list <- function(i,lists,filename){
+  if(filename %in% list.files(getwd())){
+    write(lists[[i]], file = filename, sep = '\n', append = TRUE)
+    closeAllConnections()
+    return(NULL)
+  } else {
+    con <- file(filename)
+    open(con, open = 'w')
+    writeLines(lists[[i]], con, sep = '\n')
+    closeAllConnections()
+    return(NULL)
+  }
+}
 
-
-
+grab_meta_critic_data <- function(filmid){
+  
+}

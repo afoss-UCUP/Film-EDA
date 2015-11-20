@@ -189,8 +189,10 @@ library(XML)
 library(RCurl)
 library(data.table)
 
+#generate alphabet links from boxoffice mojo TOC
 letter_list <- grab_mojo_toc()
 
+#parallized scraping of all boxoffice mojo movie pages
 cl <- makePSOCKcluster(8,outfile="")
 setDefaultCluster(cl)
 clusterExport(NULL, c('extract_mojo_movie_pages','build_movie_list'))
@@ -199,36 +201,26 @@ stopCluster(cl)
 closeAllConnections()
 gc()
 
+#filter results for more recent releases
 mojo_links <- rbindlist(mojo_links)
 mojo_links <- mojo_links[open_date>'2003-11-18'&!is.na(open_date),]
 
-source(paste(getwd(),'/assist_functions.R', sep = ''))#loads additional functions
-
-new <- grab_mojo_movies_data(mojo_links[1106,filmid])
-
-cl <- makePSOCKcluster(7,outfile="")
-setDefaultCluster(cl)
-clusterExport(NULL,envir = .GlobalEnv, c('get_box_from_b_tags','get_talent_from_td_tags','build_historic_performance','build_week_performance'))
-mojo_data <- parLapply(cl,mojo_links[1:1000,filmid],grab_mojo_movies_data)
-stopCluster(cl)
-closeAllConnections()
-gc()
-
-mojo_data <- list()
-for (i in 101:200){
-  mojo_data[[i]] <-grab_mojo_movies_data(mojo_links[i,filmid])
-  print(i)
-} 
-
+#parallelized scraping of each boxoffice mojo individual movie page
 library(doParallel)
 cl <- makePSOCKcluster(7,outfile="")
 registerDoParallel(cl)
-new <- foreach(i = 1:100, .init = NULL,
-               .errorhandling = 'pass',
-               .verbose = TRUE,.combine = c,
-               .export = c('get_box_from_b_tags','get_talent_from_td_tags',
-                           'build_historic','build_week','compose_weekly_dataframe'),
-               .packages = c('rvest','XML','RCurl','data.table','rjson')
+movie_data_list <- foreach(i = 1:dim(mojo_links)[1], .init = NULL,
+               .errorhandling = 'remove',.verbose = TRUE,.combine = c,
+               .export = c('get_box_from_b_tags',
+                           'get_talent_from_td_tags',
+                           'build_historic',
+                           'build_week',
+                           'compose_weekly_dataframe'),
+               .packages = c('rvest'
+                             ,'XML',
+                             'RCurl',
+                             'data.table',
+                             'rjson')
                ) %dopar% {
                  filmid <- mojo_links[i,filmid]
   instance <- grab_mojo_movies_data(filmid)
@@ -237,21 +229,29 @@ stopCluster(cl)
 closeAllConnections()
 gc()
 
-x <- iris[which(iris[,5] != "setosa"), c(1,5)]
-trials <- 10000
-ptime <- system.time({
-  r <- foreach(icount(trials), .init = NULL,
-               .errorhandling = 'pass',.verbose = TRUE,
-               .combine=cbind) %dopar% {
-  ind <- sample(100, 100, replace=TRUE)
-  result1 <- glm(x[ind,2]~x[ind,1], family=binomial(logit))
-  coefficients(result1)
+#save Rdata file of scraped pages
+save(movie_data_list,file = 'movie_data_list.Rdata')
+
+#repair remaining title and domestic performance fields
+library(rjson)
+i <- 1
+while(i < length(movie_data_list)+1){
+  check <- fromJSON(movie_data_list[[i]],method = 'C')
+  if(length(check$title)>1){
+    check$title <- check$title[1]
   }
-  })[3]
-ptime
+  if(sum(names(check)%like%'domestic')>0){
+    nm <- which(names(check)%like%'domestic')
+    check[[nm]] <- NULL
+    print(i)
+  }
+  movie_data_list[[i]] <- toJSON(check,method = 'C')
+  
+  i <- i+1
+}
 
-source(paste(getwd(),'/assist_functions.R', sep = ''))#loads additional functions
+#write to json doc
+lapply(1:length(movie_data_list),write_list,movie_data_list,
+       'boxoffice_mojo_data.json')
 
-i = 4
-filmid <- mojo_links[i,filmid]
-instance <- grab_mojo_movies_data(filmid)
+
