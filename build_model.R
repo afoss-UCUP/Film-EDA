@@ -2,6 +2,7 @@ setwd("~/../version-control/Film-EDA")  # set my working directory
 graphics.off() # close charts
 rm(list = ls(all = TRUE))
 
+setwd("~/../version-control/Film-EDA")  # set my working directory
 source(paste(getwd(),'/assist_functions.R', sep = ''))#loads additional functions
 
 ####################################
@@ -186,7 +187,7 @@ library(parallel)
 library(rvest)
 library(XML)
 library(RCurl)
-
+library(data.table)
 
 letter_list <- grab_mojo_toc()
 
@@ -199,8 +200,58 @@ closeAllConnections()
 gc()
 
 mojo_links <- rbindlist(mojo_links)
-mojo_links <- mojo_links[open_date>'2005-11-18'&!is.na(open_date),]
+mojo_links <- mojo_links[open_date>'2003-11-18'&!is.na(open_date),]
 
+source(paste(getwd(),'/assist_functions.R', sep = ''))#loads additional functions
 
-new <- grab_mojo_movies_data(mojo_links[1211,filmid])
+new <- grab_mojo_movies_data(mojo_links[1106,filmid])
 
+cl <- makePSOCKcluster(7,outfile="")
+setDefaultCluster(cl)
+clusterExport(NULL,envir = .GlobalEnv, c('get_box_from_b_tags','get_talent_from_td_tags','build_historic_performance','build_week_performance'))
+mojo_data <- parLapply(cl,mojo_links[1:1000,filmid],grab_mojo_movies_data)
+stopCluster(cl)
+closeAllConnections()
+gc()
+
+mojo_data <- list()
+for (i in 101:200){
+  mojo_data[[i]] <-grab_mojo_movies_data(mojo_links[i,filmid])
+  print(i)
+} 
+
+library(doParallel)
+cl <- makePSOCKcluster(7,outfile="")
+registerDoParallel(cl)
+new <- foreach(i = 1:100, .init = NULL,
+               .errorhandling = 'pass',
+               .verbose = TRUE,.combine = c,
+               .export = c('get_box_from_b_tags','get_talent_from_td_tags',
+                           'build_historic','build_week','compose_weekly_dataframe'),
+               .packages = c('rvest','XML','RCurl','data.table','rjson')
+               ) %dopar% {
+                 filmid <- mojo_links[i,filmid]
+  instance <- grab_mojo_movies_data(filmid)
+}
+stopCluster(cl)
+closeAllConnections()
+gc()
+
+x <- iris[which(iris[,5] != "setosa"), c(1,5)]
+trials <- 10000
+ptime <- system.time({
+  r <- foreach(icount(trials), .init = NULL,
+               .errorhandling = 'pass',.verbose = TRUE,
+               .combine=cbind) %dopar% {
+  ind <- sample(100, 100, replace=TRUE)
+  result1 <- glm(x[ind,2]~x[ind,1], family=binomial(logit))
+  coefficients(result1)
+  }
+  })[3]
+ptime
+
+source(paste(getwd(),'/assist_functions.R', sep = ''))#loads additional functions
+
+i = 4
+filmid <- mojo_links[i,filmid]
+instance <- grab_mojo_movies_data(filmid)
