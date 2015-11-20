@@ -185,8 +185,6 @@ add_rating_and_genre <- function(other_hsx_dat,merged_movies){
   
 }
 
-
-
 #grabs fan and critic data
 grab_rating_dat <- function(name_vector,movie_names){
   library(rvest)
@@ -485,6 +483,7 @@ grab_mojo_movies_links <- function(letter){
   return(movie_links)
 }
 
+
 #takes mojo link list and builds movie & date dataframe
 build_movie_list <- function(movie_list){
   library(data.table)
@@ -521,88 +520,6 @@ build_movie_list <- function(movie_list){
     }
   }
   return(as.data.table(df))
-}
-
-##grabs BoxOffice Mojo data from individual movie title page
-grab_mojo_movies_data <- function(filmid){
-  library(rvest)
-  library(XML)
-  library(RCurl)
-  library(rjson)
-  #unload Hmisc package if loaded due to issues
-  if(sum(search()=='package:Hmisc')>0){
-    detach("package:Hmisc", unload=TRUE)	
-  }
-  
-  base_url <- 'http://www.boxofficemojo.com/'
-  dl_url <- getURL(paste(base_url,filmid,'&p=.htm', sep = ""))
-  center_box <- read_html(dl_url)%>%html_nodes('center td')
-  title <- read_html(dl_url)%>%html_nodes('br+ font b')%>%
-    html_text()
-  
-  json_box <- list()
-  json_box$title <- title
-  for(line in center_box){
-    new_line <- try(strsplit(html_text(line,trim = TRUE),': ')[[1]],
-                    silent = TRUE)
-    list_name <- tolower(gsub(' ','_',new_line[1]))
-    value <- new_line[2]
-    json_box[list_name] <- value
-  }
-  
-  b_tags <- xpathSApply(htmlParse(dl_url),"//b",xmlValue)
-  
-  td_tags <- xpathSApply(htmlParse(gsub('<br>','\n',dl_url)),"//td",xmlValue) 
-  
-  json_box <- get_box_from_b_tags(b_tags,json_box)
-  json_box <- get_talent_from_td_tags(td_tags,json_box)
-  
-  sub_pages <- getHTMLLinks(dl_url, xpQuery = 
-                              "//ul/li/a/@href")
-  
-  weekly_url <- paste("/movies/?page=weekly&id=",
-                  unlist(strsplit(filmid,'id='))[2],sep = '')
-  
-  weekend_url <- paste("/movies/?page=weekend&id=",
-                  unlist(strsplit(filmid,'id='))[2],sep = '')
-  
-  weekly <- NULL
-  weekend <- NULL
-  
-  if(length(which(sub_pages == weekly_url))!=0) {
-    dl_weekly <- getURL(paste(base_url,weekly_url,sep = ''))
-    
-    weekly <- try(build_historic_performance(dl_weekly),silent = TRUE)
-    
-    dl_weekend <- getURL(paste(base_url,weekend_url,sep = ''))
-    weekend <- try(build_historic_performance(dl_weekend),silent = TRUE) 
-    
-  }
-  
-  if(class(weekly)!='try-error'){
-    json_box$weekly <- weekly
-  }
-  
-  if(class(weekend)!='try-error'){
-    json_box$weekend <- weekend
-  }
-  
-  json_box$domestic_total_gross <- NULL
-  json_box$release_date <- as.Date(json_box$release_date,'%B %d, %Y')
-  json_box$runtime <- as.chron.ITime(paste(gsub('hrs.|min.',
-                              ':',json_box$runtime),'00',sep = ''))
-  json_box$runtime <- as.numeric(json_box$runtime)*24*60
-  if(json_box$production_budget %like% 'million'){
-    json_box$production_budget <- 
-      as.numeric(gsub('[[:alpha:]]|[[:punct:]]| ','',
-           json_box$production_budget))*1000000
-  } else {
-    json_box$production_budget <- 
-      as.numeric(gsub('[[:alpha:]]|[[:punct:]]| ','',
-           json_box$production_budget))
-  }
-  
-  return(toJSON(json_box,method = 'C'))
 }
 
 #parses boxoffice info from mojo page
@@ -658,12 +575,105 @@ get_talent_from_td_tags <- function(td_tags,json_box){
   return(json_box)
 }
 
-#build table of historic performance from mojo data
-build_historic_performance <- function(dl_file){
+##grabs BoxOffice Mojo data from individual movie title page
+grab_mojo_movies_data <- function(filmid){
+  library(rvest)
+  library(XML)
+  library(RCurl)
+  library(rjson)
+  library(data.table)
+  
+  
+  #unload Hmisc package if loaded due to issues
+  if(sum(search()=='package:Hmisc')>0){
+    detach("package:Hmisc", unload=TRUE)	
+  }
+  
+  base_url <- 'http://www.boxofficemojo.com/'
+  dl_url <- getURL(paste(base_url,filmid,'&p=.htm', sep = ""))
+  center_box <- read_html(dl_url)%>%html_nodes('center td')
+  title <- read_html(dl_url)%>%html_nodes('br+ font b')%>%
+    html_text()
+  
+  json_box <- list()
+  json_box$title <- title
+  for(line in center_box){
+    new_line <- try(strsplit(html_text(line,trim = TRUE),': ')[[1]],
+                    silent = TRUE)
+    list_name <- tolower(gsub(' ','_',new_line[1]))
+    value <- new_line[2]
+    json_box[list_name] <- value
+  }
+  
+  b_tags <- xpathSApply(htmlParse(dl_url),"//b",xmlValue)
+  
+  td_tags <- xpathSApply(htmlParse(gsub('<br>','\n',dl_url)),"//td",xmlValue) 
+  
+  json_box <- get_box_from_b_tags(b_tags,json_box)
+  json_box <- get_talent_from_td_tags(td_tags,json_box)
+  
+  sub_pages <- getHTMLLinks(dl_url, xpQuery = 
+                              "//ul/li/a/@href")
+  
+  weekly_url <- paste("/movies/?page=weekly&id=",
+                      unlist(strsplit(filmid,'id='))[2],sep = '')
+  
+  weekend_url <- paste("/movies/?page=weekend&id=",
+                       unlist(strsplit(filmid,'id='))[2],sep = '')
+  
+  weekly <- NULL
+  weekend <- NULL
+  
+  if(is.numeric(which(sub_pages %like% weekly_url))) {
+    dl_weekly <- getURL(paste(base_url,weekly_url,sep = ''))
+    
+    weekly_data <- try(build_historic(dl_file = dl_weekly),silent = TRUE)
+    weekly <- compose_weekly_dataframe(weekly_data)
+    
+    dl_weekend <- getURL(paste(base_url,weekend_url,sep = ''))
+    weekend_data <- try(build_historic(dl_file = dl_weekend),silent = TRUE)
+    weekend <- compose_weekly_dataframe(weekly_data) 
+    
+  }
+  
+  if(class(weekly)[1]!='try-error'){
+    json_box$weekly <- weekly
+  }
+  
+  if(class(weekend)[1]!='try-error'){
+    json_box$weekend <- weekend
+  }
+  
+  json_box$domestic_total_gross <- NULL
+  json_box$release_date <- as.character(
+    as.Date(json_box$release_date,'%B %d, %Y'))
+  if(json_box$runtime %like% 'min.'){
+    json_box$runtime <- as.chron.ITime(paste(gsub('hrs.|min.',
+                                                  ':',json_box$runtime),'00',sep = ''))
+    json_box$runtime <- as.numeric(json_box$runtime)*24*60
+  } else {
+    json_box$runtime <- NA
+  }
+  if(json_box$production_budget %like% 'million'){
+    json_box$production_budget <- 
+      as.numeric(gsub('[[:alpha:]]|[[:punct:]]| ','',
+                      json_box$production_budget))*1000000
+  } else {
+    json_box$production_budget <- 
+      as.numeric(gsub('[[:alpha:]]|[[:punct:]]| ','',
+                      json_box$production_budget))
+  }
+  json_box <- toJSON(json_box,method = 'C')
+  return(json_box)
+}
+
+#build lists of historic performance from mojo data
+build_historic <- function(dl_file){
   library(XML)
   library(RCurl)
   library(data.table)
   library(rvest)
+  
   
   weekend_links <- NULL
   weekend_days <- NULL
@@ -671,13 +681,18 @@ build_historic_performance <- function(dl_file){
   weekend_theaters <- NULL
   weekend_release <- NULL
   
-  weekend_links <- getHTMLLinks(dl_file, xpQuery ="//font/a/@href")
-  weekend_links<- weekend_links[which(weekend_links %like% 'yr=')]
+  weekend_links_column <- "font a"
+  weekend_links <- read_html(dl_file)%>%
+    html_nodes(weekend_links_column)%>%html_attrs()
+  weekend_links <- unlist(weekend_links[which(weekend_links %like% 'yr=')])
+  weekend_links <- iconv(weekend_links, from = "ISO-8859-1", to = "ASCII","")
   
   weekend_days_column <- 'nobr font a'
   weekend_days <- read_html(dl_file)%>%html_nodes(weekend_days_column)%>%
     html_text()
-  weekend_days <- na.omit(gsub('Â–','-',weekend_days))
+  weekend_days <- iconv(weekend_days, from = "ISO-8859-1", to = "ASCII","-")
+  weekend_days <- na.omit(gsub('[[:punct:]]',':',weekend_days))
+  
   
   weekend_gross_column <- 'tr+ tr td:nth-child(3) font'
   weekend_grosses <- read_html(dl_file)%>%html_nodes(weekend_gross_column)%>%
@@ -694,32 +709,63 @@ build_historic_performance <- function(dl_file){
     html_text()
   weekend_release <- na.omit(as.numeric(gsub('[[:punct:]]','',weekend_release)))
   weekend_release <- c(1:length(weekend_release))
+
+  out <- NULL
+  out$weekend_links <- weekend_links 
+  out$weekend_days <- weekend_days
+  out$weekend_grosses <- weekend_grosses
+  out$weekend_theaters <- weekend_theaters
+  out$weekend_release <- weekend_release
+  return(out)
+}
+
+#changes lists of historic performance from mojo data into dataframe
+compose_weekly_dataframe <- function(weekly_data){
+  library(data.table)
   
-  out <- lapply(c(1:length(weekend_release)),
-                build_week_performance,weekend_release,weekend_links,weekend_days,
-                weekend_grosses,weekend_theaters)
+  weekend_release <- weekly_data$weekend_release
+  weekend_links <- weekly_data$weekend_links
+  weekend_days <- weekly_data$weekend_days
+  weekend_grosses <- weekly_data$weekend_grosses
+  weekend_theaters <- weekly_data$weekend_theaters
+  
+  out <- list()
+  
+  for(i in c(1:length(weekend_release))){
+    out[[i]] <- build_week(i,weekend_release,weekend_links,
+                           weekend_days,weekend_grosses,
+                           weekend_theaters)
+  }
+                
   out <- rbindlist(out)
   
+  check <- out$days
+  
   #fixes bad handling of 3 day weekends
-  if(median(out[[4]])<5){
+  if(2 %in% check & 3 %in% check){
     remove <- which(out[,days]>2)-1
-    out <- out[!remove]
-    out[,rel_week:=c(1:dim(out)[1])]
+    if(is.numeric(remove)){
+      out <- out[!remove]
+      out[,rel_week:=c(1:dim(out)[1])]
+    }
   }
   
   return(out)
 }
 
 #build a single week's performance
-build_week_performance <- function(i,rel,lnks,dys,gro,thea){
+build_week <- function(i,rel,lnks,dys,gro,thea){
   library(data.table)
+  
   
   rel_week <- rel[i]
   norm_date <- unlist(strsplit(lnks[i],'='))
   year <- substr(norm_date[2],1,4)
   week <- substr(norm_date[3],1,2)
-  dates <- unlist(strsplit(dys[i],'-'))
-  if(!is.na(as.numeric(dates[2]))){
+  dates <- stringr::str_split(dys[i],'::')[[1]]
+  
+  check <- try(as.numeric(dates[2]), silent = TRUE)
+  if(!is.na(check)){
     end <- paste(substr(dates[1],1,3),' ',dates[2],', ',year, sep = '')
     begin <- paste(dates[1],', ',year, sep = '')
   } else {
@@ -750,8 +796,11 @@ build_week_performance <- function(i,rel,lnks,dys,gro,thea){
   df$theaters <- theaters
   df$days <- days
   df$gross <- gross
-  
-  return(as.data.table(df))
+  df <- as.data.table(df)
+  return(df)
   
 }
+
+
+
 
