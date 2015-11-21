@@ -764,5 +764,22 @@ write_list <- function(i,lists,filename){
 }
 
 grab_meta_critic_data <- function(filmid){
+  library(rvest)
+  library(XML)
+  library(RCurl)
   
+  baseurl <- 'http://www.metacritic.com/movie/'
+  dl_url <- getURLContent(paste(baseurl,filmid,sep=''), useragent = 'Moviefan-via-R')
+  closeAllConnections()
+  main_vals <- read_html(dl_url)%>%html_nodes('a div')%>%html_text()
+  dl_url <- getURLContent(paste(baseurl,filmid,'/critic-reviews',sep=''), useragent = 'Moviefan-via-R')
+  closeAllConnections()
+  critic_scores <- read_html(dl_url)%>%html_nodes('#main .indiv')%>%html_text()
+  out <- NULL
+  out$main_vals <- main_vals
+  out$critic_scores <- critic_scores
+  return(out)
 }
+
+
+
