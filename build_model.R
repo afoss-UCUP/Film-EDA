@@ -193,7 +193,7 @@ library(data.table)
 letter_list <- grab_mojo_toc()
 
 #parallized scraping of all boxoffice mojo movie pages
-cl <- makePSOCKcluster(8,outfile="")
+cl <- makePSOCKcluster(7,outfile="")
 setDefaultCluster(cl)
 clusterExport(NULL, c('extract_mojo_movie_pages','build_movie_list'))
 mojo_links <- parLapply(cl,letter_list,grab_mojo_movies_links)
@@ -250,8 +250,83 @@ while(i < length(movie_data_list)+1){
   i <- i+1
 }
 
-#write to json doc
+#write to boxoffice mojo json doc
 lapply(1:length(movie_data_list),write_list,movie_data_list,
        'boxoffice_mojo_data.json')
 
+#reload json doc
+library(rjson)
+file <- 'boxoffice_mojo_data.json'
+con = file(file, "r")
+movie_json_list <- readLines(con, -1L)
+closeAllConnections()
 
+#add critic and audience from metacritic
+json_with_critics <- lapply(movie_json_list,add_metacritic_to_json_row)
+
+#write to json doc
+lapply(1:length(json_with_critics),write_list,json_with_critics,
+       'boxoffice_mojo_data_with_critics.json')
+
+#reload json with critics doc
+library(rjson)
+file <- 'boxoffice_mojo_data_with_critics.json'
+con = file(file, "r")
+movie_with_critics_json_list <- readLines(con, -1L)
+closeAllConnections()
+
+quick_frame <- function(json_line){
+  
+  film <- fromJSON(json_line, method = 'C')
+  film$gross <- film$box_office$domestic
+  film$get_local_showtimes_at_imdb <- NULL
+  if(is.na(as.numeric(film$gross))){
+    return(NULL)
+  } else {
+    film$box_office <- NULL
+    film$talent <- NULL
+    film$weekly <- NULL
+    film$theaters <- max(unlist(film$weekend$theaters),na.rm=T)
+    film$production_budget <- as.numeric(film$production_budget)
+    film$week <- film$weekend$week[1]
+    film$weekend <- NULL
+    if('rating' %in% names(film)){
+      film$critics_avg <- try(median(unlist(film$rating$critic_scores), na.rm=T), silent =T)
+      if(class(film$critics_avg)[1] =='try-error' | !is.numeric(film$critics_avg)){
+        film$critics_avg <- NA
+      }
+      film$audience_avg <- try(as.numeric(film$rating$audience_avg), silent =T)
+      if(class(film$critics_avg)[1] =='try-error'){
+        film$audience_avg <- NA
+      }
+      film$critics_IQR <- try(IQR(unlist(film$rating$critic_scores)),silent = T)
+      if(class(film$critics_IQR)[1] =='try-error'){
+        film$critics_IQR <- NA
+      }
+      film$rating <- NULL
+    } else {
+      film$critics_avg <- NA
+      film$audience_avg <- NA
+      film$critics_IQR <- NA
+    }
+    film <- as.data.frame(film)
+  }
+  return(film)
+}
+
+small_frame <- NULL
+for(i in 1:length(movie_with_critics_json_list)){
+  small_frame <- rbind(small_frame,quick_frame(movie_with_critics_json_list[[i]]))
+  i
+}
+
+small_frame <- lapply(movie_with_critics_json_list,quick_frame)
+
+small_frame <- data.table::rbindlist(small_frame)
+
+small_frame$runtime <- as.numeric(small_frame$runtime)
+small_frame$release_date <- as.Date(small_frame$release_date,'%Y-%m-%d')
+small_frame$production_budget <- as.numeric(small_frame$production_budget)
+small_frame$theaters <- as.numeric(small_frame$theaters)
+
+summary(m1 <- lm(gross~.,small_frame))
