@@ -763,7 +763,79 @@ write_list <- function(i,lists,filename){
   }
 }
 
-grab_meta_critic_data <- function(filmid){
+
+
+
+
+
+
+
+add_metacritic_to_json_row <- function(json_row){
+  library(rjson)
+  library(stringr)
+  
+  film <- fromJSON(json_row, method = 'C')
+  filmid <- make_metacritic_id(film)
+  
+  rating <- NULL
+  
+  if(str_count(film$title,'\\(*[[0-9]]{4}\\)') == 1){
+    rating <- try(grab_metacritic_data(filmid[2]),silent = T)
+    
+    if(class(rating)[1] == 'try-error'){
+      rating <- try(grab_metacritic_data(filmid[3]),silent = T)
+    }
+  }
+  
+  if(class(rating)[1] == 'try-error' | is.null(rating)){
+    rating <- try(grab_metacritic_data(filmid[1]),silent = T)
+  }
+  
+  if(class(rating)[1] == 'try-error' | is.null(rating)){
+    return(json_row)
+  } else {
+  
+  film$rating$critic_avg <- rating$main_vals[1]
+  film$rating$audience_avg <- rating$main_vals[2]
+  film$rating$critic_scores <- rating$critic_scores
+  
+  json_row <- toJSON(film, method = 'C')
+  }
+  
+  rm(film)
+  
+  return(json_row)
+}
+
+make_metacritic_id <- function(film){
+  library(stringr)
+  
+  title <- film$title
+  title <- strsplit(title,' \\(')[[1]]
+  filmid <- title[1]
+  filmid <- gsub('3,2,1...','3-2-1',filmid)
+  filmid <- gsub('\\$9.99','999',filmid)
+  
+  if(is.numeric(str_count(filmid,':[[:alpha:]]'))){
+    filmid <- gsub(':','-',filmid)
+  }
+  
+  filmid <- gsub('-','qqqqq',filmid)
+  filmid <- gsub('\\$','s',filmid)
+  filmid <- gsub('\\&','and',filmid)
+  filmid <- gsub('[[:punct:]]','',filmid)
+  filmid <- gsub(' |qqqqq','-',filmid)
+  filmid <- tolower(filmid)
+  
+  year <- suppressWarnings(as.numeric(substr(film$release_date,1,4)))
+  
+  filmid <- c(filmid,paste(filmid,'-',year,sep = ''))
+  filmid <- c(filmid,paste(filmid[1],'-',year-1,sep = ''))
+  
+  return(filmid)
+}
+
+grab_metacritic_data <- function(filmid){
   library(rvest)
   library(XML)
   library(RCurl)
@@ -775,11 +847,10 @@ grab_meta_critic_data <- function(filmid){
   dl_url <- getURLContent(paste(baseurl,filmid,'/critic-reviews',sep=''), useragent = 'Moviefan-via-R')
   closeAllConnections()
   critic_scores <- read_html(dl_url)%>%html_nodes('#main .indiv')%>%html_text()
+  
   out <- NULL
-  out$main_vals <- main_vals
-  out$critic_scores <- critic_scores
+  out$main_vals <- suppressWarnings(as.numeric(main_vals))
+  out$critic_scores <- suppressWarnings(as.numeric(critic_scores))
+  
   return(out)
 }
-
-
-
