@@ -1,14 +1,14 @@
+# This script controls all of the website scraping utilities
+# Please do not run - it takes hours to scrape everything
+
 setwd("~/../version-control/Film-EDA")  # set my working directory
 graphics.off() # close charts
 rm(list = ls(all = TRUE))
 
 setwd("~/../version-control/Film-EDA")  # set my working directory
-source(paste(getwd(),'/data_assembly_utilities.R', sep = ''))#loads additional functions
+source(paste(getwd(), 
+             '/data_assembly_utilities.R', sep = ''))#load additional functions
 
-
-#################################
-#     Box Office Mojo Script    #
-#################################
 library(parallel)
 library(rvest)
 library(XML)
@@ -190,4 +190,4 @@ film_actor_list <- lapply(movie_with_critics_json_list,
 
 #write to json doc
 lapply(1:length(film_actor_list), write_list, film_actor_list,
-       'boxoffice_mojo_data_with_critics_and_actor_dat.json')
+       'boxoffice_mojo_metacritic_merge.json')
