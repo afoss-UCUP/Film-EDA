@@ -180,147 +180,34 @@ unique(smp)
 
 
 
-#################################
-BOMOJO
-#################################
-library(parallel)
-library(rvest)
-library(XML)
-library(RCurl)
-library(data.table)
 
-#generate alphabet links from boxoffice mojo TOC
-letter_list <- grab_mojo_toc()
 
-#parallized scraping of all boxoffice mojo movie pages
-cl <- makePSOCKcluster(7,outfile="")
-setDefaultCluster(cl)
-clusterExport(NULL, c('extract_mojo_movie_pages','build_movie_list'))
-mojo_links <- parLapply(cl,letter_list,grab_mojo_movies_links)
-stopCluster(cl)
-closeAllConnections()
-gc()
 
-#filter results for more recent releases
-mojo_links <- rbindlist(mojo_links)
-mojo_links <- mojo_links[open_date>'2003-11-18'&!is.na(open_date),]
+##### JUNK ######
+fromJSON(out <- attach_actor_data(movie_with_critics_json_list,actor_data))
 
-#parallelized scraping of each boxoffice mojo individual movie page
-library(doParallel)
-cl <- makePSOCKcluster(7,outfile="")
-registerDoParallel(cl)
-movie_data_list <- foreach(i = 1:dim(mojo_links)[1], .init = NULL,
-               .errorhandling = 'remove',.verbose = TRUE,.combine = c,
-               .export = c('get_box_from_b_tags',
-                           'get_talent_from_td_tags',
-                           'build_historic',
-                           'build_week',
-                           'compose_weekly_dataframe'),
-               .packages = c('rvest'
-                             ,'XML',
-                             'RCurl',
-                             'data.table',
-                             'rjson')
-               ) %dopar% {
-                 filmid <- mojo_links[i,filmid]
-  instance <- grab_mojo_movies_data(filmid)
-}
-stopCluster(cl)
-closeAllConnections()
-gc()
+degree(actor.network)
 
-#save Rdata file of scraped pages
-save(movie_data_list,file = 'movie_data_list.Rdata')
+which.max(degree(actor.network))
 
-#repair remaining title and domestic performance fields
-library(rjson)
-i <- 1
-while(i < length(movie_data_list)+1){
-  check <- fromJSON(movie_data_list[[i]],method = 'C')
-  if(length(check$title)>1){
-    check$title <- check$title[1]
-  }
-  if(sum(names(check)%like%'domestic')>0){
-    nm <- which(names(check)%like%'domestic')
-    check[[nm]] <- NULL
-    print(i)
-  }
-  movie_data_list[[i]] <- toJSON(check,method = 'C')
-  
-  i <- i+1
-}
+bad.vs<-V(actor.network)[degree(actor.network)<200] #identify those vertices part of less than three edges
+actor.network<-delete.vertices(actor.network, bad.vs)
 
-#write to boxoffice mojo json doc
-lapply(1:length(movie_data_list),write_list,movie_data_list,
-       'boxoffice_mojo_data.json')
+set.seed(3952)
+layout1 <- layout.fruchterman.reingold(actor.network)
+plot(actor.network, layout=layout.kamada.kawai)
 
-#reload json doc
-library(rjson)
-file <- 'boxoffice_mojo_data.json'
-con = file(file, "r")
-movie_json_list <- readLines(con, -1L)
-closeAllConnections()
 
-#add critic and audience from metacritic
-json_with_critics <- lapply(movie_json_list,add_metacritic_to_json_row)
 
-#write to json doc
-lapply(1:length(json_with_critics),write_list,json_with_critics,
-       'boxoffice_mojo_data_with_critics.json')
+plot(actor.network)
 
-#reload json with critics doc
-library(rjson)
-file <- 'boxoffice_mojo_data_with_critics.json'
-con = file(file, "r")
-movie_with_critics_json_list <- readLines(con, -1L)
-closeAllConnections()
+# small_frame <- NULL
+# for(i in 1:length(movie_with_critics_json_list)){
+#   small_frame <- rbind(small_frame,quick_frame(movie_with_critics_json_list[[i]]))
+#   i
+# }
 
-quick_frame <- function(json_line){
-  
-  film <- fromJSON(json_line, method = 'C')
-  film$gross <- film$box_office$domestic
-  film$get_local_showtimes_at_imdb <- NULL
-  if(is.na(as.numeric(film$gross))){
-    return(NULL)
-  } else {
-    film$box_office <- NULL
-    film$talent <- NULL
-    film$weekly <- NULL
-    film$theaters <- max(unlist(film$weekend$theaters),na.rm=T)
-    film$production_budget <- as.numeric(film$production_budget)
-    film$week <- film$weekend$week[1]
-    film$weekend <- NULL
-    if('rating' %in% names(film)){
-      film$critics_avg <- try(median(unlist(film$rating$critic_scores), na.rm=T), silent =T)
-      if(class(film$critics_avg)[1] =='try-error' | !is.numeric(film$critics_avg)){
-        film$critics_avg <- NA
-      }
-      film$audience_avg <- try(as.numeric(film$rating$audience_avg), silent =T)
-      if(class(film$critics_avg)[1] =='try-error'){
-        film$audience_avg <- NA
-      }
-      film$critics_IQR <- try(IQR(unlist(film$rating$critic_scores)),silent = T)
-      if(class(film$critics_IQR)[1] =='try-error'){
-        film$critics_IQR <- NA
-      }
-      film$rating <- NULL
-    } else {
-      film$critics_avg <- NA
-      film$audience_avg <- NA
-      film$critics_IQR <- NA
-    }
-    film <- as.data.frame(film)
-  }
-  return(film)
-}
-
-small_frame <- NULL
-for(i in 1:length(movie_with_critics_json_list)){
-  small_frame <- rbind(small_frame,quick_frame(movie_with_critics_json_list[[i]]))
-  i
-}
-
-small_frame <- lapply(movie_with_critics_json_list,quick_frame)
+small_frame <- lapply(actor_list,quick_frame)
 
 small_frame <- data.table::rbindlist(small_frame)
 
@@ -329,4 +216,54 @@ small_frame$release_date <- as.Date(small_frame$release_date,'%Y-%m-%d')
 small_frame$production_budget <- as.numeric(small_frame$production_budget)
 small_frame$theaters <- as.numeric(small_frame$theaters)
 
-summary(m1 <- lm(gross~.,small_frame))
+summary(m1 <- lm(gross~., data = small_frame[,!'title',with = F]))
+
+# 
+# library(xgboost)
+# m2 <- xgboost(booster = 'gbtree',data = model.matrix(~.,small_frame[,!c('title','gross'),with = F])[,-1], label = model.matrix(~.,small_frame[,with = F])[,'gross'],
+#               eta = .1, max.depth = 3,nround = 5000, gamma = .05, min_child_weight = 6, objective = "reg:linear")
+# dtrain <- xgb.DMatrix(model.matrix(~.,small_frame[,!c('title','gross'),with = F])[,-1], label = model.matrix(~.,small_frame[,with = F])[,'gross'])
+# 
+# bst1 <- xgb.cv(data = dtrain, nround=1000, predict = T, nfold = 3, 
+#                   max.depth =4,gamma = .5, eta = .03,min_child_weight = 4, objective = "reg:linear",print.every.n = 10)
+# 
+# bst1 <- xgb.train(data = dtrain, nround=which.min(bst1$dt$test.rmse.mean), predict = T, nfold = 4, 
+#                   max.depth =4,gamma = .5, eta = .03,min_child_weight = 4, objective = "reg:linear", print.every.n = 10)
+# 
+# 
+# model = xgb.dump(bst1, with.stats=TRUE)
+# # get the feature real names
+# names = dimnames(model.matrix(~.,small_frame[,!c('title','gross'),with = F])[,-1])[[2]]
+# # compute feature importance matrix
+# importance_matrix = xgb.importance(names, model=bst1)
+# 
+# # plot
+# gp = xgb.plot.importance(importance_matrix)
+# print(gp) 
+# 
+# 
+
+title_old <- NULL
+for(i in 1:length(movie_data)){
+  title_old <- c(title_old,paste(fromJSON(movie_data[[i]], method = 'C')$title,fromJSON(movie_data[[i]], method = 'C')$release_date,sep = ''))
+}
+
+fixed <- list()
+for(i in 1:length(movie_data_list)){
+  new_film <- fromJSON(movie_data_list[[i]], method = 'C')
+  title <- paste(new_film$title,new_film$release_date,sep = '')
+  j <- NULL
+  j = which(title_old == title)
+  if(length(j)==0){
+    next
+  }
+  film <- fromJSON(movie_data[[j]], method = 'C')
+  film$weekend <- NULL
+  film$weekend <- new_film$weekend
+  film <- toJSON(film, method = 'C')
+  fixed <- c(fixed,film)
+}
+
+#write to json doc
+lapply(1:length(fixed),write_list,fixed,
+       'boxoffice_mojo_metacritic_merge.json')
