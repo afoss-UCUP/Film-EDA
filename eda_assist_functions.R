@@ -117,9 +117,23 @@ make_film_frame <- function(json_line){
   return(film)
 }
 
+# builds data.table of unique films given a column in that table
 unique_films <- function(df, column){
   library(data.table)
   df <- unique(df[, list(get(column), title)])
   setnames(df, 'V1', column)
   return(df)
 }
+
+# creates a correlation marker for use in plots
+plot_cor <- function(col1, col2) {
+  if(length(col1) != length(col2)){
+    return('Error: col length mismatch')
+  } else {
+    c1 <- cor(cbind(col1, col2), use = 'complete')[1, 2]
+    c1 <- paste('R = ',round(c1, 3), sep = '')
+  }
+  return (c1)
+}
+
+    
