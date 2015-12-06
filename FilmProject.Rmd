@@ -421,7 +421,7 @@ Thoughts on competition:
 
 New releases are a big deal. It is pretty easy to see what I mean by plotting our key film metrics (weekly gross, weekly theaters, daily theater eff) by week of a film's release. We'll see that the early weeks of a film's release dominate grosses and theater counts. Given what we learned about the shape of the distributions before, I show them all log transformed. I limit the scope to the first two months of release and plot the median and correlation so that we'll get a sense for the linear relationship. Relative week was omitted from univariate analysis as it would have been nonsensical.
 
-```{r echo=FALSE, Novelty_Plots, fig.width = 12, fig.height = 4, htmlcap = "Fig. 6: Weekly domestic box office, weekly theater counts and daily theater efficiency<br>log10 transformed and plotted by relative week of a film's release."}
+```{r echo=FALSE, Novelty_Plots, fig.width = 12, fig.height = 4, htmlcap = "Fig. 6: Weekly domestic box office, weekly theater counts and daily theater efficiency<br>log10 transformed and plotted by relative week of a film's release. Correlation overlaid in black."}
 
 #make correlation note
 c1 <- plot_cor(movie_df[, log10(weekly_gross)], movie_df[, relative_week])
@@ -481,7 +481,7 @@ Some observations:
 
 I mentioned earlier on that seasonality measured by relative week of release would be important.  I provide my evidence in the following plots. I plot individual film weeks (top row) and the aggregates we calculated for our competative measures (bottom). While we only have 12 years of data for the aggregates, there are some clear trends.
 
-```{r echo=FALSE, Seasonal_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 6: Weekly domestic box office, weekly theater counts and critic averages.<br>Individual films (top) and competative aggregates (bottom) plotted by week of year. Green dot denotes an mean, blue bar is median."}
+```{r echo=FALSE, Seasonal_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 7: Weekly domestic box office, weekly theater counts and critic averages.<br>Individual films (top) and competative aggregates (bottom) plotted by week of year. Green dot denotes an average, blue bar is median."}
 
 #find chart range and plot weekly gross
 week_gross_range <- get_chart_range(movie_df, 'weekly_gross', .01, .95)
@@ -489,7 +489,7 @@ p27 <- ggplot(aes(x = week, y = weekly_gross),
               data = movie_df[!is.na(weekly_gross), ]) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = week_gross_range) +
-  stat_summary(fun.y=mean, geom="point", size=1, color = 'darkgreen') + 
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen') + 
   scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
 
 #find chart range and plot weekly_theaters
@@ -498,7 +498,7 @@ p28 <- ggplot(aes(x = week, y = weekly_theaters),
               data = movie_df[!is.na(weekly_theaters), ]) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = week_theater_range) +
-  stat_summary(fun.y=mean, geom="point", size=1, color = 'darkgreen') + 
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen') + 
   scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
 
 #find chart range and plot critic_avg during week of release by week
@@ -507,7 +507,7 @@ p29 <- ggplot(aes(x = week, y = critics_avg),
               data = movie_df[!is.na(critics_avg), ]) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = week_critic_range) +
-  stat_summary(fun.y=mean, geom="point", size=1, color = 'darkgreen') + 
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen') + 
   scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
 
 #find chart range and plot critic_avg during week of release by week
@@ -531,7 +531,8 @@ p32 <- ggplot(aes(x = week, y = comp_critic), data = critic_weeks) +
   coord_cartesian(ylim = comp_critic_range) + 
   scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
 
-grid.arrange(p27, p28, p29, p30, p31, p32, nrow = 2, top = 'Seasonal Impact: Individual Films and Competative Aggregates')
+grid.arrange(p27, p28, p29, p30, p31, p32, nrow = 2,
+             top = 'Seasonal Impact: Individual Films and Competative Aggregates')
 
 #clean plots from memory (they're big)
 rm(p27, p28, p29, p30, p31, p32)
@@ -547,6 +548,96 @@ A few things worth mentioning:
 
 ## Film Category: Genre and Rating
 
+```{r echo = FALSE, Category_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 8: Total domestic box office, cumulative theater counts and daily theater efficiency by category of film.<br>Unique film values. Green dot denotes mean. Blue bar denotes median."}
+
+#add grosses to top genres
+gross_dat <- unique_films(movie_df, 'gross')
+genre_gross_dat <- merge(genres_dat, gross_dat, by = 'title')
+
+# plot grosses for top genres
+genre_gross_range <- get_chart_range(genre_gross_dat, 'gross', .01, .99)
+p33 <- ggplot(aes(y = gross, x = genre),
+             data = genre_gross_dat[genre %in% top_genres, ]) +
+  geom_boxplot(color = 'navyblue') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0)) +
+  coord_cartesian(ylim = genre_gross_range) +
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
+
+#add cumulative theaters to top genres
+cum_theater_dat <- unique_films(movie_df, 'cum_theaters')
+genre_theater_dat <- merge(genres_dat, cum_theater_dat, by = 'title')
+
+# find range and plot total theaters for top genres
+genre_theater_range <- get_chart_range(genre_theater_dat, 
+                                   'cum_theaters', .01, .99)
+p34 <- ggplot(aes(y = cum_theaters, x = genre),
+             data = genre_theater_dat[genre %in% top_genres, ]) +
+  geom_boxplot(color = 'navyblue') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0)) +
+  coord_cartesian(ylim = genre_theater_range) +
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
+
+# build genre efficiency measure (to keep consistant, 
+# multiplied by 6 as each theater is a week)
+genre_eff_dat <- merge(genre_gross_dat, genre_theater_dat, by = c('title', 'genre'))
+genre_eff_dat[, daily_theater_eff:= gross / (cum_theaters * 6)]
+
+# find range and plot efficiencies for top genres
+genre_eff_range <- get_chart_range(genre_eff_dat, 
+                                   'daily_theater_eff', .01, .99)
+p35 <- ggplot(aes(y = daily_theater_eff, x = genre),
+             data = genre_eff_dat[genre %in% top_genres, ]) +
+  geom_boxplot(color = 'navyblue') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0)) +
+  coord_cartesian(ylim = genre_eff_range) +
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
+
+#make unique rating data
+rating_gross_dat <- merge(rating_dat, gross_dat, by = 'title')
+
+# plot grosses for top ratings
+rating_gross_range <- get_chart_range(rating_gross_dat, 'gross', .01, .99)
+p36 <- ggplot(aes(y = gross, x = mpaa_rating),
+             data = rating_gross_dat) +
+  geom_boxplot(color = 'navyblue') +
+  coord_cartesian(ylim = rating_gross_range) +
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
+
+#add cumulative theaters to top ratings
+rating_theater_dat <- merge(rating_dat, cum_theater_dat, by = 'title')
+
+# find range and plot total theaters for top ratings
+rating_theater_range <- get_chart_range(rating_theater_dat, 
+                                   'cum_theaters', .01, .99)
+p37 <- ggplot(aes(y = cum_theaters, x = mpaa_rating),
+             data = rating_theater_dat) +
+  geom_boxplot(color = 'navyblue') +
+  coord_cartesian(ylim = rating_theater_range) +
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
+
+# build rating efficiency measure (to keep consistant, 
+# multiplied by 6 as each theater is a week)
+rating_eff_dat <- merge(rating_gross_dat, rating_theater_dat,
+                        by = c('title', 'mpaa_rating'))
+rating_eff_dat[, daily_theater_eff:= gross / (cum_theaters * 6)]
+
+# find range and plot efficiencies for top ratings
+rating_eff_range <- get_chart_range(rating_eff_dat, 
+                                   'daily_theater_eff', .01, .99)
+p38 <- ggplot(aes(y = daily_theater_eff, x = mpaa_rating),
+             data = rating_eff_dat) +
+  geom_boxplot(color = 'navyblue') +
+  coord_cartesian(ylim = rating_eff_range) +
+  stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
+
+grid.arrange(p33, p34, p35, p36, p37, p38, nrow = 2,
+             top = 'Genre, Ratings and Film Performance Metrics')
+
+#clean plots from memory (they're big)
+rm(p33, p34, p35, p36, p37, p38)
+
+
+```
 
 ```{r echo = FALSE}
 # 
