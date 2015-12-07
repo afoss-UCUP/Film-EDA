@@ -29,6 +29,7 @@ library(data.table) # this is a great library for data manipulation
 library(gridExtra)
 library(knitr)
 library(GGally)
+library(RColorBrewer)
 
 setwd("~/../version-control/Film-EDA")  # set my working directory
 source(paste(getwd(), '/eda_assist_functions.R', sep = ''))#loads additional functions
@@ -477,7 +478,7 @@ Some observations:
 * There is not much change between theater counts during the first and second weeks of a film's release. This is possibly an artifact of how distribution is contracted: distributors and theater chains typically have an agreement on the number of screens for the first two weeks of a film's release
 * Daily theater efficiency is the least linearly related to relative week - perhaps this is because we remove some of the relationship during construction (weekly theaters are have a substantial relationship with relative week and we're dividing that out of the weekly gross)
 
-## Seasonality
+## Box Office Seasonality
 
 I mentioned earlier on that seasonality measured by relative week of release would be important.  I provide my evidence in the following plots. I plot individual film weeks (top row) and the aggregates we calculated for our competative measures (bottom). While we only have 12 years of data for the aggregates, there are some clear trends.
 
@@ -547,6 +548,8 @@ A few things worth mentioning:
 * Late Summer/early Fall see low boxoffice on an individual and aggregate basis with high theater counts and low individual critic averages - this means a large number of pretty bad films are in theaters and daily theater efficiency should be lower
 
 ## Film Category: Genre and Rating
+
+I want to take a little time to look into performance by genre and rating.  I have a sense that it matters - certainly the prevalence of large G-rated computer animated films and Summer PG-13-rated superhero flicks makes me think it should be relavent.  I plot the key metrics against genre and rating below.
 
 ```{r echo = FALSE, Category_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 8: Total domestic box office, cumulative theater counts and daily theater efficiency by category of film.<br>Unique film values. Green dot denotes mean. Blue bar denotes median."}
 
@@ -638,6 +641,60 @@ rm(p33, p34, p35, p36, p37, p38)
 
 
 ```
+
+Quick commentary:
+
+* The genre results kind of mirror my own take as to what a blockbuster looks like - we see Action / Adventure has both the largest total gross, the greatest per theater efficiency and one of the greatest cumulative theater week counts
+* Animation, Fantasy and Sci-Fi Action are all also potential huge films
+* If theaters could make frictionless tradeoffs among films, I would expect our efficiency measure to look fairly flat across genres (as it does for ratings) - the fact that we can see a lot of variation for certain genres implies something (may be contracts or seasonality) prevents that
+* Horror has a reputation for high ROI to film  producers (they're cheap to make), but we can see that efficiency is also low, so it may be hard to get those films in theaters when other fare is out
+* We see that most genres have positive skew for grosses (higher mean than median), so unusual films have the potential to make a fair amount of money in most categories
+* Family friendly G-rated pictures are the most rewarding ratign category; perhaps this is due to them having the largest addressable audience and the fact that more tickets are sold when a family attends as a group - unfortunately I don't have data to test these ideas
+
+Given our discovery that effeciency is not consistent across genres while it is fairly close among ratings, I thought it may merit investigating the intersection of genre.  I will plot what amounts to a crosstab of rating and genre and investigate any seasonality that may prevent theaters from making the tradeoffs that create uniform efficiency across genres. 
+
+```{r echo = FALSE, Category_Cross, fig.width = 12, fig.height = 12, htmlcap = "Fig. 9: Genere by rating and seasonal charts showing genre and rating by week of year.<br>Top 20 most frequent genres examined (top). Seasonal genre chart limited to top four to assist legibility (middle)."}
+
+genre_rating_dat <- merge(genres_dat, rating_dat, by = 'title')
+p39 <- ggplot(aes(x = genre, fill = mpaa_rating),
+              data = genre_rating_dat[genre %in% top_genres, ]) +
+  geom_bar(position = 'fill') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0),
+        legend.position = 'right') +
+  scale_fill_brewer(type = 'qual', palette = 'Set2')
+
+week_dat <- unique_films(movie_df, 'week')
+genre_week_dat <- merge(genres_dat, week_dat, by = 'title')
+p40 <- ggplot(aes(x = week, fill = genre),
+              data = genre_week_dat[genre %in% top_genres[1:4], ]) +
+  geom_bar(position = 'dodge') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0),
+        legend.position = 'right') +
+  scale_fill_brewer(type = 'qual', palette = 'Accent') + 
+  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+
+rating_week_dat <- merge(rating_dat, week_dat, by = 'title')
+p41 <- ggplot(aes(x = week, fill = mpaa_rating),
+              data = rating_week_dat) +
+  geom_bar(position = 'dodge') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0),
+        legend.position = 'right') +
+  scale_fill_brewer(type = 'qual', palette = 'Set2') + 
+  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+
+grid.arrange(p39, p40, p41, nrow = 3,
+             top = 'Genre and Rating: Category and Calendar')
+
+rm(p39, p40, p41)
+
+```
+
+Notes:
+
+* Certain genres are heavily dominated by specific ratings: Family Adventure is PG; Romance, Action / Adventure, Romantic Comedy and Sci-Fi Action are all heavily PG-13; Horror and Drama / Thriller are mostly R;
+* G-rated films are rare: Animation and Family Comedy are the only genres with any G-films
+* As I suspected, seasonal patterns exist in genre: Horror peaks in mid-Fall (to co-incide with Halloween); Animation is strong in the Summer, but peaks in the family-friendly period around Thanksgiving; Dramas are few and far between during the Summer, gradually increasing up through award season in the Spring; Comedy is always common, but peaks in late-Summer and late-Spring (periods with low grosses and theater efficiency), potentially playing the role of 'filler' fare
+* Ratings are seasonal, but less so: PG and G-rated films are out in low, constant levels; PG-13 is usually common, but has some share stolen by R-rated films going into Halloween
 
 ```{r echo = FALSE}
 # 
