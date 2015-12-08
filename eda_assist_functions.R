@@ -7,7 +7,8 @@ knit_hooks$set(htmlcap = function(before, options, envir) {
   }
 })
 
-# sets knit hook options to print image captions in html
+# takes a data.table and column 
+# then quantile range to set x/y limits when plotting
 get_chart_range <- function(df,col,bg,en){
   quantile(as.numeric(df[, get(col)]), c(bg, en), na.rm = T)
 }
@@ -136,4 +137,30 @@ plot_cor <- function(col1, col2) {
   return (c1)
 }
 
+# finds diag attributes in ggpairs object and replaces them with variable names
+# from data.table to improve plot readability
+make_diag_name <- function(plt,df){
+  library(stringr)
+  diags <- which(plt$plots %like% 'Diag')
+  for(i in 1:length(diags)){
+    plt$plots[[diags[i]]] <- paste("ggally_text('",
+                                   str_wrap(gsub("_"," ",names(df)[i]), width = 8)
+                                   ,"', angle = 45, size = 3.5)",sep = '')
+  }
+  return(plt)
+}
+
+# finds cor attributes in ggpairs object and adds a text size
+# to improve plot readability
+change_cor_size <- function(plt,sz){
+  library(stringr)
+  cors <- which(plt$plots %like% '_cor')
+  for(i in 1:length(cors)){
+    val <- plt$plots[[cors[i]]]
+    val <- substr(val,1,nchar(val)-1)
+    val <- paste(val,", size = ",sz,")", sep = '')
+    plt$plots[[cors[i]]] <- val
+  }
+  return(plt)
+}
     
