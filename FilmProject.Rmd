@@ -32,7 +32,7 @@ library(GGally)
 library(RColorBrewer)
 
 setwd("~/../version-control/Film-EDA")  # set my working directory
-source(paste(getwd(), '/eda_assist_functions.R', sep = ''))#loads additional functions
+source(paste(getwd(), '/eda_assist_functions.R', sep = ''))#loads functions
 
 ```
 
@@ -645,8 +645,8 @@ rm(p33, p34, p35, p36, p37, p38)
 Quick commentary:
 
 * The genre results kind of mirror my own take as to what a blockbuster looks like - we see Action / Adventure has both the largest total gross, the greatest per theater efficiency and one of the greatest cumulative theater week counts
-* Animation, Fantasy and Sci-Fi Action are all also potential huge films
-* If theaters could make frictionless tradeoffs among films, I would expect our efficiency measure to look fairly flat across genres (as it does for ratings) - the fact that we can see a lot of variation for certain genres implies something (may be contracts or seasonality) prevents that
+* Animation, Fantasy and Sci-Fi Action are all also potential blockbuster genres
+* If theaters could make frictionless tradeoffs among films, I would expect our efficiency measure to look fairly flat across genres (as it does for ratings: the interquartile ranges all overlap) - the fact that we can see a lot of variation for certain genres implies something (may be contracts or seasonality) prevents that
 * Horror has a reputation for high ROI to film  producers (they're cheap to make), but we can see that efficiency is also low, so it may be hard to get those films in theaters when other fare is out
 * We see that most genres have positive skew for grosses (higher mean than median), so unusual films have the potential to make a fair amount of money in most categories
 * Family friendly G-rated pictures are the most rewarding ratign category; perhaps this is due to them having the largest addressable audience and the fact that more tickets are sold when a family attends as a group - unfortunately I don't have data to test these ideas
@@ -694,50 +694,129 @@ Notes:
 * Certain genres are heavily dominated by specific ratings: Family Adventure is PG; Romance, Action / Adventure, Romantic Comedy and Sci-Fi Action are all heavily PG-13; Horror and Drama / Thriller are mostly R;
 * G-rated films are rare: Animation and Family Comedy are the only genres with any G-films
 * As I suspected, seasonal patterns exist in genre: Horror peaks in mid-Fall (to co-incide with Halloween); Animation is strong in the Summer, but peaks in the family-friendly period around Thanksgiving; Dramas are few and far between during the Summer, gradually increasing up through award season in the Spring; Comedy is always common, but peaks in late-Summer and late-Spring (periods with low grosses and theater efficiency), potentially playing the role of 'filler' fare
-* Ratings are seasonal, but less so: PG and G-rated films are out in low, constant levels; PG-13 is usually common, but has some share stolen by R-rated films going into Halloween
+* Ratings are seasonal, but less so: PG and G-rated films are out in low, constant levels; PG-13 is usually common (especially during late Summer), but has some share stolen by R-rated films going into Halloween
+* We only have limited data, so the seasonal inferences, while interesting, are likely not that statistically significant (n(years) = 12)
 
-```{r echo = FALSE}
-# 
-# p27 <- ggplot(aes(x = week, y = comp_box), data = box_weeks) +
-#   geom_boxplot(color = 'navyblue')
-# 
-# p28 <- ggplot(aes(x = week, y = comp_critic), data = critic_weeks) +
-#   geom_boxplot(color = 'navyblue')
-# 
-# p29 <- ggplot(aes(x = week, y = comp_theater), data = theater_weeks) +
-#   geom_boxplot(color = 'navyblue')
-# 
-# #construct film specific measure of theater efficiency - I multiply cum_theaters
-# #by six since all theaters are on a theater/week basis, given the univariate
-# #distribution, from before, this variable will be log transformed
-# movie_df[,cum_theater_eff := log10(gross / (cum_theaters * 6))]
-# 
-# #build dataset of features invariate by week (unique to a film)
-# unifilm_dat <- unique(movie_df[,list(cum_theater_eff, runtime,
-#                                      critics_avg, count_critics, critics_IQR,
-#                                      audience_avg, talent_cum_pics,
-#                                      talent_cum_deg, talent_cum_bet)])
-# #build scatterplot matrix - factor variables not used here due to legibility
-# ggpairs(unifilm_dat)
-# 
-# #build dataset of features invariate by week (unique to a film)
-# timedfilm_dat <- unique(movie_df[,list(log10(weekly_gross), log10(weekly_theaters), log10(daily_theater_eff), relative_week, comp_week_cash, comp_week_critics, comp_week_theaters)])
-# 
-# ggpairs(timedfilm_dat)
+## Numeric Measures: Film-Week Variables
+
+We have a large number of additional variables remaining.  These are all numeric and can be divided into two categories: those that vary by film (e.g., they are unique on a per film basis) and those that vary by film-week (the remaining competative measures).  The following table shows pairwise plots of those variables that change for a film on a weekly basis. I use ggpairs from the [GGAlly](https://cran.r-project.org/web/packages/GGally/index.html) package. Variables that needed a log transform in the univariate section are provided in a log transformed version below, too. The competative variables below are the year-week cumulative values less our film specific measure (so the value of all other films in a given film-week).  We already know the relative week of release is important, so I throw it in for good measure.
+
+```{r echo = FALSE, echo = FALSE, Weekly_Pairwise, fig.width = 12, fig.height = 12, htmlcap = "Fig. 10: Pairwise plots of weekly varying numeric variables from univariate analysis section<br>with appropriate log10 transformed variables (key metrics)."}
+
+weekfilm_dat <- copy(unique(movie_df[weekly_gross > 0 
+                                    & weekly_theaters > 0
+                                    & daily_theater_eff > 0, 
+                                    list(weekly_gross,
+                                         weekly_theaters,
+                                         daily_theater_eff,
+                                         relative_week,
+                                         comp_week_gross,
+                                         comp_week_critics,
+                                         comp_week_theaters)]))
+
+# log transform key metrics due given univariate distributions
+weekfilm_dat[, log10_weekly_gross := log10(weekly_gross)]
+weekfilm_dat[, log10_weekly_theaters := log10(weekly_theaters)]
+weekfilm_dat[, log10_daily_theater_eff := log10(daily_theater_eff)]
+
+p42 <- ggpairs(na.omit(weekfilm_dat),
+               lower = list(continuous = 'density'),
+               columnLabels = rep("", dim(weekfilm_dat)[2]),
+               axisLabels = "none",
+               title = 'Week-Level Pairwise Plots')
+
+# fix ggpairs diag to display variable names
+p42 <- make_diag_name(p42,weekfilm_dat)
+
+# change size of text in correlation boxes
+p42 <- change_cor_size(p42, 4)
+
+#display plot
+print(p42)
+
+#remove plot to free memory
+rm(p42)
+```
+
+Notworthy points:
+
+* Relative week of release has the strongest relationship overall with my log transformed key metrics and is the reason I prefer the log transformed versions of these variables in later analysis
+* Competition from the theaters used by other films has a non-trivial relationship to a film's weekly gross and theater efficiency
+* As one would guess competition from quality is negatively related to a film's key metrics.  However, the relationship is not strong.  Perhaps specific movies are not that readily substitutable
+* There is a slightly positive effect from competition in terms of weekly grosses. I would have expected the opposite (the share of the audience wallet could be relatively zero-sum, so a dollar spent on a competing film is a dollar lost).  However, in light of the prior point, films may not be substitutable and, given the seasonal effect we saw above, weekly grosses may all be slightly correlated. At any rate, the relationship is minor.
+
+
+## Numeric Measures: Unique Film Variables
+
+For the following plots, I include those variables that are unique by film. I apologize in advance for the small font size needed to make the chart legible. Variables that I examined in log transform are provided in a log transformed version below, too.
+
+```{r echo = FALSE, Unique_Pairwise, fig.width = 12, fig.height = 12, htmlcap = "Fig. 11: Pairwise plots of unique by film numeric variables from univariate analysis section<br>with appropriate log10 transformed variables (key metrics and talent measures)."}
+
+# construct film specific measure of theater efficiency - I multiply cum_theaters
+# by six since all theaters are on a theater/week basis
+movie_df[,cum_theater_eff := (gross / (cum_theaters * 6))]
+
+# build dataset of features invariate by week (unique to a film)
+# filter to remove problematic values
+unifilm_dat <- copy(unique(movie_df[gross > 0 
+                                    & talent_cum_deg > 0
+                                    & talent_cum_bet > 0, 
+                                    list(gross,
+                                         cum_theaters,
+                                         cum_theater_eff,
+                                         runtime,
+                                         critics_avg,
+                                         count_critics,
+                                         critics_IQR,
+                                         audience_avg,
+                                         talent_cum_pics,
+                                         talent_cum_deg,
+                                         talent_cum_bet)]))
+
+# given the univariate distributions from before, log transform some of them to
+# see if it improves linear fit
+unifilm_dat[, log10_gross := log10(gross)]
+unifilm_dat[, log10_cum_theaters := log10(cum_theaters)]
+unifilm_dat[, log10_cum_theater_eff := log10(cum_theater_eff)]
+unifilm_dat[, log10_talent_cum_pics := log10(talent_cum_pics)]
+unifilm_dat[, log10_talent_cum_deg := log10(talent_cum_deg)]
+unifilm_dat[, log10_talent_cum_bet := log10(talent_cum_bet)]
+
+
+
+# Build scatterplot matrix - factor variables not used here due to legibility
+# I remove the axis titles as I insert them along the diag later
+# Also, density plots look cleaner than scatter plots for small images
+p43 <- ggpairs(na.omit(unifilm_dat),
+               lower = list(continuous = 'density'),
+               columnLabels = rep("", dim(unifilm_dat)[2]),
+               axisLabels = "none",
+               title = 'Film-Level Pairwise Plots')
+
+# fix ggpairs diag to display variable names
+p43 <- make_diag_name(p43,unifilm_dat)
+
+# change size of text in correlation boxes
+p43 <- change_cor_size(p43, 4)
+
+#display plot
+print(p43)
+
+#remove plot to free memory
+rm(p43)
 
 ```
 
+Some interesting observations:
 
-# Bivariate Analysis
-
-### Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
-
-### Did you observe any interesting relationships between the other features (not the main feature(s) of interest)?
-
-### What was the strongest relationship you found?
-
-
-
+* The cast variables (cumulative pictures, cumulative degrees, cumulative betweeness) are highly correlated in all forms (standard and log transformed). 
+* All cast variables probably measure roughly the same thing since a major driver of all of them is the number of films an actor has been in.  For berevity and model stability, I will only use cumulative pictures in the remaining analysis (standard form is slightly more linear related to my key metrics than log transformed)
+* I have a slight preference for using the log transformed versions of my key metrics as they are more linear by relative week of release (as I mentioned before). Gross and efficiency measures, in particular, show more linearity with critic measures when log transformed (I realize this is, to some degree, a matter of preference as runtime and cumulative pictures are more linear with respect to non-transformed key metrics)
+* Runtime and counts of critics have the best linear relationship with my key metrics
+* Interesting to see that runtime and critic averages are positively correlated (why would critics like long movies?)
+* Also interesting to see that critic counts and critic averages are positively correlated (is this because critics want to review good films, because producers invite critics to review better films, or some issue with the Metacritic collection?)
+* Metacritic's audience opinion doesn't seem to matter as much as critic opinion - maybe this is because Metacritic reviewers are an unusual sample of movie-goers
+* Dispersion in critic opinion (critic IQR) is not strongly related to much of anything. However, it may absorb variance in a model when combined with other factors, so I'll leave it for now
 
 # Multivariate Plots Section
 
@@ -783,3 +862,4 @@ Notes:
 ------
 
 # Reflection
+
