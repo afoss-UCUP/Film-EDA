@@ -651,7 +651,7 @@ Quick commentary:
 * We see that most genres have positive skew for grosses (higher mean than median), so unusual films have the potential to make a fair amount of money in most categories
 * Family friendly G-rated pictures are the most rewarding ratign category; perhaps this is due to them having the largest addressable audience and the fact that more tickets are sold when a family attends as a group - unfortunately I don't have data to test these ideas
 
-Given our discovery that effeciency is not consistent across genres while it is fairly close among ratings, I thought it may merit investigating the intersection of genre.  I will plot what amounts to a crosstab of rating and genre and investigate any seasonality that may prevent theaters from making the tradeoffs that create uniform efficiency across genres. 
+Given our discovery that effeciency is not consistent across genres while it is fairly close among ratings, I thought it may merit investigating the intersection of genre and rating.  I will plot what amounts to a crosstab of rating and genre and investigate any seasonality that may prevent theaters from making the tradeoffs that create uniform efficiency across genres. 
 
 ```{r echo = FALSE, Category_Cross, fig.width = 12, fig.height = 12, htmlcap = "Fig. 9: Genere by rating and seasonal charts showing genre and rating by week of year.<br>Top 20 most frequent genres examined (top). Seasonal genre chart limited to top four to assist legibility (middle)."}
 
@@ -723,7 +723,7 @@ p42 <- ggpairs(na.omit(weekfilm_dat),
                lower = list(continuous = 'density'),
                columnLabels = rep("", dim(weekfilm_dat)[2]),
                axisLabels = "none",
-               title = 'Week-Level Pairwise Plots')
+               title = 'Film-Week Pairwise Plots')
 
 # fix ggpairs diag to display variable names
 p42 <- make_diag_name(p42,weekfilm_dat)
@@ -743,7 +743,9 @@ Notworthy points:
 * Relative week of release has the strongest relationship overall with my log transformed key metrics and is the reason I prefer the log transformed versions of these variables in later analysis
 * Competition from the theaters used by other films has a non-trivial relationship to a film's weekly gross and theater efficiency
 * As one would guess competition from quality is negatively related to a film's key metrics.  However, the relationship is not strong.  Perhaps specific movies are not that readily substitutable
-* There is a slightly positive effect from competition in terms of weekly grosses. I would have expected the opposite (the share of the audience wallet could be relatively zero-sum, so a dollar spent on a competing film is a dollar lost).  However, in light of the prior point, films may not be substitutable and, given the seasonal effect we saw above, weekly grosses may all be slightly correlated. At any rate, the relationship is minor.
+* There is a slightly positive effect from competition in terms of weekly grosses. I would have expected the opposite (the share of the audience wallet could be relatively zero-sum, so a dollar spent on a competing film is a dollar lost).  However, in light of the prior point, films may not be substitutable and, given the seasonal effect we saw above, weekly grosses may all be slightly correlated. At any rate, the relationship is minor
+* There is positive correlation between competition quality and theaters - since both of these are driven by quantities of films, that makes sense
+* Competition in critics and theaters are both negativey correlated with competative weekly gross - this would make sense if there are fewer, larger films out when box office is greatest (which we observed in the univariate and seasonality sections)
 
 
 ## Numeric Measures: Unique Film Variables
@@ -782,8 +784,6 @@ unifilm_dat[, log10_talent_cum_pics := log10(talent_cum_pics)]
 unifilm_dat[, log10_talent_cum_deg := log10(talent_cum_deg)]
 unifilm_dat[, log10_talent_cum_bet := log10(talent_cum_bet)]
 
-
-
 # Build scatterplot matrix - factor variables not used here due to legibility
 # I remove the axis titles as I insert them along the diag later
 # Also, density plots look cleaner than scatter plots for small images
@@ -791,7 +791,7 @@ p43 <- ggpairs(na.omit(unifilm_dat),
                lower = list(continuous = 'density'),
                columnLabels = rep("", dim(unifilm_dat)[2]),
                axisLabels = "none",
-               title = 'Film-Level Pairwise Plots')
+               title = 'Unique Film Pairwise Plots')
 
 # fix ggpairs diag to display variable names
 p43 <- make_diag_name(p43,unifilm_dat)
@@ -822,9 +822,111 @@ Some interesting observations:
 
 ```{r echo=FALSE, Multivariate_Plots}
 
+
+
+
+#make a variable to check path dependence of total gross
+
+gross_tier <- cut(movie_df[relative_week == 1, gross],
+                  breaks = quantile(movie_df[, gross],
+                                    c(0, .05, .33, .66, .95, 1)))
+
+gross_tier <- data.table('title' = movie_df[relative_week == 1, title], 
+                        gross_tier)
+
+gross_tier[,gross_tier:= factor(gross_tier, ordered = T)]
+
+movie_df <- merge(movie_df, gross_tier, by = 'title')
+
+
+
+open_tier <- cut(movie_df[relative_week == 1, weekly_gross],
+                  breaks = quantile(movie_df[, weekly_gross],
+                                    c(0, .05, .33, .66, .95, 1)))
+
+open_tier <- data.table('title' = movie_df[relative_week == 1, title], 
+                        open_tier)
+
+open_tier[,open_tier:= factor(open_tier, ordered = T)]
+
+
+movie_df <- merge(movie_df, open_tier, by = 'title')
+
+
+#make a variable to check path dependence of total gross
+
+critic_tier <- cut(movie_df[relative_week == 1, critics_avg],
+                  breaks = quantile(movie_df[, critics_avg],
+                                    c(0, .05, .33, .66, .95, 1), na.rm = ))
+
+critic_tier <- data.table('title' = movie_df[relative_week == 1, title], 
+                        critic_tier)
+
+critic_tier[,critic_tier:= factor(critic_tier, ordered = T)]
+
+movie_df <- merge(movie_df, critic_tier, by = 'title')
+
+
+
+MV_gross_range <- get_chart_range(movie_df, 'weekly_gross', .01, .999)
+p44 <- ggplot(aes(x = relative_week, y = weekly_gross, color = critic_tier),
+              data = movie_df[!is.na(weekly_gross), ]) +
+  geom_point(alpha = .25, position = position_jitter(h = 0)) +
+  coord_cartesian(xlim = c(.5, 8.5), ylim = MV_gross_range) +
+  geom_line(stat = 'summary', fun.y = 'median', size = 1) +
+  geom_line(stat = 'summary', fun.y = quantile, prob = .25, linetype = 2, size = .5) +
+  geom_line(stat = 'summary', fun.y = quantile, prob = .75, linetype = 2, size = .5) +
+  scale_y_log10() +
+  ylab('log10(weekly_gross)')
+
+MV_theater_range <- get_chart_range(movie_df, 'weekly_theaters', .01, .999)
+p45 <- ggplot(aes(x = relative_week, y = weekly_theaters, color = critic_tier),
+              data = movie_df[!is.na(weekly_theaters), ]) +
+  geom_point(alpha = .1, position = position_jitter(h = 0)) +
+  coord_cartesian(xlim = c(.5, 8.5), ylim = MV_theater_range) +
+  geom_line(stat = 'summary', fun.y = 'median', size = 1) +
+  geom_line(stat = 'summary', fun.y = quantile, prob = .25, linetype = 2, size = .5) +
+  geom_line(stat = 'summary', fun.y = quantile, prob = .75, linetype = 2, size = .5) +
+  scale_y_log10() +
+  ylab('log10(weekly_theaters)')
+
+MV_eff_range <- get_chart_range(movie_df, 'daily_theater_eff', .01, .999)
+p46 <- ggplot(aes(x = relative_week, y = daily_theater_eff, color = critic_tier),
+              data = movie_df[!is.na(daily_theater_eff), ]) +
+  geom_point(alpha = .1, position = position_jitter(h = 0)) +
+  coord_cartesian(xlim = c(.5, 8.5), ylim = MV_eff_range) +
+  geom_line(stat = 'summary', fun.y = 'median', size = 1) +
+  geom_line(stat = 'summary', fun.y = quantile, prob = .25, linetype = 2, size = .5) +
+  geom_line(stat = 'summary', fun.y = quantile, prob = .75, linetype = 2, size = .5) +
+  scale_y_log10() +
+  ylab('log10(daily_theater_eff)')
+
+
+
+
+
+
+movie_df[between(release_date,as.Date(paste(year,5,16,sep = '-')),
+                                  as.Date(paste(year,8,15,sep = '-'))),
+         season := 'Summer']
+movie_df[between(release_date, as.Date(paste(year,8,16,sep = '-')),
+                                  as.Date(paste(year,11,15,sep = '-'))),
+         season := 'Fall']
+movie_df[between(release_date, as.Date(paste(year,2,16,sep = '-')),
+                                  as.Date(paste(year,5,15,sep = '-'))),
+         season := 'Spring']
+movie_df[between(release_date, as.Date(paste(year,11,16,sep = '-')),
+                                  as.Date(paste(year,12,31,sep = '-')))
+         | between(release_date, as.Date(paste(year,1,1,sep = '-')),
+                                  as.Date(paste(year,2,15,sep = '-'))),
+         season := 'Winter']
+
 ```
 
-# Multivariate Analysis
+# Multivariate Exploration
+
+Given the importance of novelty (the relative week of release), it makes sense to continue examining our key metrics along those lines.  We can 
+
 
 ### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
 
