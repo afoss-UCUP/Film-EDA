@@ -163,4 +163,66 @@ change_cor_size <- function(plt,sz){
   }
   return(plt)
 }
+
+#make categorical 'tiers' from relative week 1 numeric variable
+make_tier <- function(df, col, quan){
+  library(data.table)
+  
+  vals <- df[relative_week == 1, list(title, get(col))]
+  tiers <- cut(vals[, V2], breaks = quantile(vals[, V2], quan))
+  tiers <- factor(tiers, ordered = T)
+  vals[, eval(paste(col, 'tier', sep = '_')):= tiers]
+  vals[, V2:= NULL]
+  
+  return(vals)
+}
     
+#builds multivariate plots vs relative week and some tier
+build_tiered_week_plot <- function(df, col, tier){
+  # find display range
+  plot_range <- get_chart_range(df, as.character(col), .01, .999)
+  
+  #build small dataset
+  dat <- df[, list(relative_week, V1 = get(col), V2 = get(tier))]
+  
+  # build ggplot
+  plt <- ggplot(aes(x = relative_week,
+                  y = V1,
+                  color = V2),
+              data = dat[!is.na(V1), ]) +
+    geom_point(alpha = .25, position = position_jitter(h = 0)) +
+    coord_cartesian(xlim = c(.5, 8.5),
+                    ylim = plot_range) +
+    geom_line(stat = 'summary',
+              fun.y = 'median',
+              size = 1) +
+    geom_line(stat = 'summary',
+              fun.y = quantile, prob = .25,
+              linetype = 2,
+              size = .5) +
+    geom_line(stat = 'summary',
+              fun.y = quantile, prob = .75,
+              linetype = 2,
+              size = .5) +
+    scale_y_log10() +
+    ylab(paste('log10(', col, ')', sep = '')) +
+    xlab('relative_week') +
+    theme(legend.position="bottom") +
+    labs(color = tier)
+         
+  return(plt)
+}
+
+#extract legends for complex plots
+grab_legend <- function(plt){
+  # get grobs
+  ptab <- ggplot_gtable(ggplot_build(plt))
+  # make list of grob names
+  lst <- lapply(ptab$grobs, function(x) x$name)
+  # find legend grob
+  sec <- which(lst %like% 'guide-box')
+  legend <- ptab$grobs[[sec]]
+  return(legend)
+}
+
+
