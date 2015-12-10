@@ -169,7 +169,7 @@ make_tier <- function(df, col, quan){
   library(data.table)
   
   vals <- df[relative_week == 1, list(title, get(col))]
-  tiers <- cut(vals[, V2], breaks = quantile(vals[, V2], quan))
+  tiers <- cut(vals[, V2], breaks = quantile(vals[, V2], quan, na.rm = T))
   tiers <- factor(tiers, ordered = T)
   vals[, eval(paste(col, 'tier', sep = '_')):= tiers]
   vals[, V2:= NULL]
@@ -189,8 +189,8 @@ build_tiered_week_plot <- function(df, col, tier){
   plt <- ggplot(aes(x = relative_week,
                   y = V1,
                   color = V2),
-              data = dat[!is.na(V1), ]) +
-    geom_point(alpha = .25, position = position_jitter(h = 0)) +
+              data = dat[!is.na(V1) & !is.na(V2), ]) +
+    geom_point(alpha = .1, position = position_jitter(h = 0)) +
     coord_cartesian(xlim = c(.5, 8.5),
                     ylim = plot_range) +
     geom_line(stat = 'summary',
