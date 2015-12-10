@@ -137,11 +137,13 @@ str(movie_df)
 
 ## Key Film Performance Measures
 
-I was primarily interested in better understanding U.S. domestic boxoffice performance for the films in the sample. Performance can be measured a number of different ways, but given the granularity of the data I have, the most meaningful is probably a measure of efficiency, which I call daily theater efficiency. 
+I was primarily interested in better understanding U.S. domestic boxoffice performance for the films in the sample. Performance can be measured a number of different ways, but given the granularity of the data I have, the most meaningful measures is probably a measure of efficiency, which I call daily theater efficiency. 
 
 Daily theater efficiency is a derived feature and is an expression of dollars produced per theater.  It allows a theater owner to assess whether he should show one movie or another. All other things equal, it is always better to show more films with higher daily theater efficiency. 
 
 To go a little further, it is easy to see that, for any film, the $\small{weekly\ gross=total\ tickets \times average\ price}$.  A more complete breakout of $\small{total\ tickets=\frac{screens}{theater} \times theaters \times \frac{shows}{day} \times \frac{tickets}{show} \times days}$. We have some limitations in our data, so we'll just use theaters and days as a stand in.  To get daily theater efficiency, we just calculate $\small{\frac{weekly\ gross}{(theaters \times days)}}$ which is a proxy for how often shows are played, how many screens a film is on and how full the shows are if we assume price is constant across films/screenings (obviously not true, but we don't have better data).
+
+To understand efficiency, I'll also have to drill into its components: gross and theaters.
 
 ```{r echo=FALSE, Main_Feature_Plots, fig.align = 'center', fig.width = 12, fig.height = 6, htmlcap = 'Fig. 1: Film weekly grosses, theaters, daily theater efficiency; standard and log transformed'}
 
@@ -818,115 +820,285 @@ Some interesting observations:
 * Metacritic's audience opinion doesn't seem to matter as much as critic opinion - maybe this is because Metacritic reviewers are an unusual sample of movie-goers
 * Dispersion in critic opinion (critic IQR) is not strongly related to much of anything. However, it may absorb variance in a model when combined with other factors, so I'll leave it for now
 
-# Multivariate Plots Section
+# Multivariate Exploration
 
-```{r echo=FALSE, Multivariate_Plots}
+## Picking Winners
 
+In terms of business importance, understanding what differentiates the best films (acording to our key metrics) from the rest is of huge interest.  Given the influence of novelty (the relative week of release), it also makes sense to continue examining our key metrics along those lines.  The following analysis makes use of multivariate analysis to try to tease out the differences in lifecycle among films. I try to see what differences are observable in film lifecycle if we had 'perfect foresight' into how big a domestic box office success a film became. 
 
+### Perfect Foresight 
 
+To assist this analysis, I make a tiered factor variable by cutting my total gross figures at and making categories of the following quantiles: 0 to .05, .05 to .33, .33 to .66, .66 to .95, and .95 to 1. These same quantile breaks are used for all of my tiered categories in the following section.
 
-#make a variable to check path dependence of total gross
+```{r echo=FALSE, Perfect_Foresight_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 12: Key metrics by relative week of release. Colors represent perfect foresight into total gross tier.<br>Median lines are solid, .25 and .75 quantile lines are dashed."}
 
-gross_tier <- cut(movie_df[relative_week == 1, gross],
-                  breaks = quantile(movie_df[, gross],
-                                    c(0, .05, .33, .66, .95, 1)))
+#build variables to check for path dependence among films
 
-gross_tier <- data.table('title' = movie_df[relative_week == 1, title], 
-                        gross_tier)
+#choose quantiles to examine
+qtiles <- c(0, .05, .33, .66, .95, 1)
 
-gross_tier[,gross_tier:= factor(gross_tier, ordered = T)]
+#build 'perfect foresight' tiered gross factor
+gross_tier <- make_tier(movie_df, 'gross', qtiles)
 
+#add gross tier to main data set
 movie_df <- merge(movie_df, gross_tier, by = 'title')
 
+#build gross_tier vs realtive week plots
+#weekly gross
+p44 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'gross_tier')
+#weekly theaters
+p45 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'gross_tier')
+#daily theater eff
+p46 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'gross_tier')
+
+# grab joint legend
+joint_legend <- grab_legend(p44)
+
+# remove individual legends 
+p44 <- p44 + theme(legend.position="none")
+p45 <- p45 + theme(legend.position="none")
+p46 <- p46 + theme(legend.position="none")
 
 
-open_tier <- cut(movie_df[relative_week == 1, weekly_gross],
-                  breaks = quantile(movie_df[, weekly_gross],
-                                    c(0, .05, .33, .66, .95, 1)))
+grid.arrange(arrangeGrob(p44, p45, p46, nrow = 1),
+             joint_legend, nrow = 2, heights = c(10, 1),
+             top = 'Key Metrics and Perfect Foresigt: Release Lifecycle')
 
-open_tier <- data.table('title' = movie_df[relative_week == 1, title], 
-                        open_tier)
+rm(p44, p45, p46)
 
-open_tier[,open_tier:= factor(open_tier, ordered = T)]
-
-
-movie_df <- merge(movie_df, open_tier, by = 'title')
-
-
-#make a variable to check path dependence of total gross
-
-critic_tier <- cut(movie_df[relative_week == 1, critics_avg],
-                  breaks = quantile(movie_df[, critics_avg],
-                                    c(0, .05, .33, .66, .95, 1), na.rm = ))
-
-critic_tier <- data.table('title' = movie_df[relative_week == 1, title], 
-                        critic_tier)
-
-critic_tier[,critic_tier:= factor(critic_tier, ordered = T)]
-
-movie_df <- merge(movie_df, critic_tier, by = 'title')
-
-
-
-MV_gross_range <- get_chart_range(movie_df, 'weekly_gross', .01, .999)
-p44 <- ggplot(aes(x = relative_week, y = weekly_gross, color = critic_tier),
-              data = movie_df[!is.na(weekly_gross), ]) +
-  geom_point(alpha = .25, position = position_jitter(h = 0)) +
-  coord_cartesian(xlim = c(.5, 8.5), ylim = MV_gross_range) +
-  geom_line(stat = 'summary', fun.y = 'median', size = 1) +
-  geom_line(stat = 'summary', fun.y = quantile, prob = .25, linetype = 2, size = .5) +
-  geom_line(stat = 'summary', fun.y = quantile, prob = .75, linetype = 2, size = .5) +
-  scale_y_log10() +
-  ylab('log10(weekly_gross)')
-
-MV_theater_range <- get_chart_range(movie_df, 'weekly_theaters', .01, .999)
-p45 <- ggplot(aes(x = relative_week, y = weekly_theaters, color = critic_tier),
-              data = movie_df[!is.na(weekly_theaters), ]) +
-  geom_point(alpha = .1, position = position_jitter(h = 0)) +
-  coord_cartesian(xlim = c(.5, 8.5), ylim = MV_theater_range) +
-  geom_line(stat = 'summary', fun.y = 'median', size = 1) +
-  geom_line(stat = 'summary', fun.y = quantile, prob = .25, linetype = 2, size = .5) +
-  geom_line(stat = 'summary', fun.y = quantile, prob = .75, linetype = 2, size = .5) +
-  scale_y_log10() +
-  ylab('log10(weekly_theaters)')
-
-MV_eff_range <- get_chart_range(movie_df, 'daily_theater_eff', .01, .999)
-p46 <- ggplot(aes(x = relative_week, y = daily_theater_eff, color = critic_tier),
-              data = movie_df[!is.na(daily_theater_eff), ]) +
-  geom_point(alpha = .1, position = position_jitter(h = 0)) +
-  coord_cartesian(xlim = c(.5, 8.5), ylim = MV_eff_range) +
-  geom_line(stat = 'summary', fun.y = 'median', size = 1) +
-  geom_line(stat = 'summary', fun.y = quantile, prob = .25, linetype = 2, size = .5) +
-  geom_line(stat = 'summary', fun.y = quantile, prob = .75, linetype = 2, size = .5) +
-  scale_y_log10() +
-  ylab('log10(daily_theater_eff)')
-
-
-
-
-
-
-movie_df[between(release_date,as.Date(paste(year,5,16,sep = '-')),
-                                  as.Date(paste(year,8,15,sep = '-'))),
-         season := 'Summer']
-movie_df[between(release_date, as.Date(paste(year,8,16,sep = '-')),
-                                  as.Date(paste(year,11,15,sep = '-'))),
-         season := 'Fall']
-movie_df[between(release_date, as.Date(paste(year,2,16,sep = '-')),
-                                  as.Date(paste(year,5,15,sep = '-'))),
-         season := 'Spring']
-movie_df[between(release_date, as.Date(paste(year,11,16,sep = '-')),
-                                  as.Date(paste(year,12,31,sep = '-')))
-         | between(release_date, as.Date(paste(year,1,1,sep = '-')),
-                                  as.Date(paste(year,2,15,sep = '-'))),
-         season := 'Winter']
 
 ```
 
+Notes on perfect foresight lifecycle:
+
+* I am immediately struck by the high degree of path dependency - we can see that, for each tier, results in each metric stay seperated from one another over the 8 week horizon I inspect (the quantile lines show that inference is pretty statistically robust)
+* Again, we can see the impact of those first two week contracts - theaters stay relatively flat, but efficiency falls dramatically for the worst films (they're playing to empty seats)
+* The best and worst films stay that way according to efficiency measures - that is weird and suggests, again, that teater owners cannot, for some reason, taker a theater playing a bad film and swap it for a good film (which would remove dispersion in efficiency over time). 
+* The lack of convergence in efficiency could be due to an oversupply of screens and theaters - all categories of movies may typically play to theaters with many empty seats, but the better movies just are less empty (unfortunately I can't check that in my data).  General oversupply could be the rational result of a hit driven business and seasonality (both things we've established already)
+
+A high degree of path dependency means that it would be helpful to know which films are likely to be 'good'.  That way, more resources (marketing, theaters, etc.) can be devoted to them. I look next at some tiered variables that coud allow us to make some inference about total gross.  
+
+First up: strength of the open (tiered based on first week gross).
+
+### Opening Strength
+
+Opening strength can definitely be used on a semi-predictive basis, at least for the remaining time a film is in theaters.
+
+```{r echo=FALSE, Opening_Tier_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 13: Key metrics by relative week of release. Colors represent opening week tier.<br>Median lines are solid, .25 and .75 quantile lines are dashed."}
+
+#build opening week factor
+open_tier <- make_tier(movie_df, 'weekly_gross', qtiles)
+# fix name for intelgibility
+setnames(open_tier,'weekly_gross_tier','open_tier')
+
+#add opening tier to main data set
+movie_df <- merge(movie_df, open_tier, by = 'title')
+
+#build open_tier vs realtive week plots
+#weekly gross
+p47 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'open_tier')
+#weekly theaters
+p48 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'open_tier')
+#daily theater eff
+p49 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'open_tier')
+
+# grab joint legend
+joint_legend <- grab_legend(p47)
+
+# remove individual legends 
+p47 <- p47 + theme(legend.position="none")
+p48 <- p48 + theme(legend.position="none")
+p49 <- p49 + theme(legend.position="none")
+
+
+grid.arrange(arrangeGrob(p47, p48, p49, nrow = 1),
+             joint_legend, nrow = 2, heights = c(10, 1),
+             top = 'Opening Week: Release Lifecycle')
+
+rm(p47, p48, p49)
+
+
+```
+
+Opening week notes:
+
+* Sleeper hits are very real!  The smallest 5% opening films seem to show in very few, very packed (top efficiency) locations. They hit peak grosses after a month or so and trail off in performace very slowly. Now, since our sample is drawn from films that at some point are in wide release, we have a bit of a bias and these films are those that cross-over into the mainstream - certainly plenty of small films never make it (though they're excluded here)
+* We see evidence of rational behavior by theater owners! As I said before, we should see convergence in efficiency over time and we finally see some among the middle and bottom tier openers.  Also, as sleeper hits take off, more theaters add them, bringing their efficiency into line with the big opening hits
+* Convergence in efficiency is far from complete - we still see theaters over indexed to bad films.
+
+Next up: Critical acclaim.
+
+### Critical Acclaim
+
+I'll next tier films by critic average ratings. We're using critic scores as a proxy for quality and we know these are correlated in a bivariate analysis. Critic reviews are, again, something that can be used in realtime to make decisions about allocating resources to a release.  Hopefully, we'll see evidence of path dependence that would help us determine which films are the best by ultimate gross. We may also see evidence of other categories of 'special' films.
+
+```{r echo=FALSE, Critic_Tier_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 14: Key metrics by relative week of release. Colors represent critical acclaim tier.<br>Median lines are solid, .25 and .75 quantile lines are dashed."}
+
+
+#build criticing week factor
+critic_tier <- make_tier(movie_df, 'critics_avg', qtiles)
+# fix name for intelgibility
+setnames(critic_tier,'critics_avg_tier','critic_tier')
+
+#add criticing tier to main data set
+movie_df <- merge(movie_df, critic_tier, by = 'title')
+
+#build critic_tier vs realtive week plots
+#weekly gross
+p50 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'critic_tier')
+#weekly theaters
+p51 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'critic_tier')
+#daily theater eff
+p52 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'critic_tier')
+
+# grab joint legend
+joint_legend <- grab_legend(p50)
+
+# remove individual legends 
+p50 <- p50 + theme(legend.position="none")
+p51 <- p51 + theme(legend.position="none")
+p52 <- p52 + theme(legend.position="none")
+
+
+grid.arrange(arrangeGrob(p50, p51, p52, nrow = 1),
+             joint_legend, nrow = 2, heights = c(10, 1),
+             top = 'Critical Acclaim: Release Lifecycle')
+
+rm(p50, p51, p52)
+
+```
+
+Critical acclaim notes:
+
+* Critics really drive longevity! Critical darlings do not open the strongest, but they attract attention in week two and tail off very slowly
+* More rational behavior by theater owners! Critical darlings get more theaters added to their releases (though not so many as the sleeper hits) and only slowly see them pulled
+* Still, theaters are over-exposed to low quality films; efficiency converges among the lower tiers, but the highest quality films keep playing to more crowded theaters
+
+Briefly, I want to see whether critical darlings (high critical appraisal) and sleeper hits (small openings) are the same films.  We've seen some evidence from their lifecycle that makes me think they're related.
+
+```{r echo=FALSE, Critical_Sleepers, fig.width = 12, fig.height = 3, htmlcap = "Fig. 15: Cross-section of critic tiers by opening tier."}
+
+ggplot(aes(x = critic_tier, fill = open_tier),
+       data = unique(movie_df[!is.na(critic_tier) & !is.na(open_tier), ])) +
+  geom_bar(position = 'fill') +
+  ggtitle('Are Sleeper Hits Critical Darlings?')
+
+```
+
+Plotting using the uniform stacked bar allows me to check the relative incidence of opening tier among different critical tiers. Using a bivariate box plot of critic tier and opening, I would have missed the fact that the top rated films are driven by extremes at both ends.  Certainly, top rated films contain more sleeper hits, but critics also seem to disproportionately love huge releases, too. So the answer is: critical darlings and sleeper hits are kinda, but not really, the same.
+
+We also considered cast / talent to be a proxy for quality.  I consider that next.
+
+### Casting Call
+
+Here I tier films by the cumulatitve pictures the cast has been in (we dropped the other measures as they're effectively the same thing). Again, we're looking for a relationship that could help us determine the best films so we can appropriatly allocate resources.  Our cast variable has a bit of a problem, by construction, in that it is an aggregate over the entire 2003-2015 period, likely creating a lookahead bias.  The lookahead mechanism would work as follows: producers attribute film performance to the cast, so actors in historically good films get asked to appear in more 'good' future films, creating a virtuous cycle.
+
+```{r echo=FALSE, Cast_Tier_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 15: Key metrics by relative week of release. Colors represent tiers of cumulative pictures done by the cast.<br>Median lines are solid, .25 and .75 quantile lines are dashed."}
+
+#build casting tier factor
+cast_tier <- make_tier(movie_df, 'talent_cum_pics', qtiles)
+# fix name for intelgibility
+setnames(cast_tier,'talent_cum_pics_tier','cast_tier')
+
+#add casting tier to main data set
+movie_df <- merge(movie_df, cast_tier, by = 'title')
+
+#build cast_tier vs realtive week plots
+#weekly gross
+p53 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'cast_tier')
+#weekly theaters
+p54 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'cast_tier')
+#daily theater eff
+p55 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'cast_tier')
+
+# grab joint legend
+joint_legend <- grab_legend(p53)
+
+# remove individual legends 
+p53 <- p53 + theme(legend.position="none")
+p54 <- p54 + theme(legend.position="none")
+p55 <- p55 + theme(legend.position="none")
+
+
+grid.arrange(arrangeGrob(p53, p54, p55, nrow = 1),
+             joint_legend, nrow = 2, heights = c(10, 1),
+             top = 'Casting Call: Release Lifecycle')
+
+rm(p53, p54, p55)
+
+```
+
+Comments on casting and performance:
+
+* Cast derived measures have the most monotonic relationship with our perfect foresight measures
+* causality is hard to tease out, but given the fact that we can tell a simple compelling story and already know our talent measure has lookahead bias, I'd be surprised if we did not see a stable, monotonic relationship
+
+You may be wondering how different our cast and critic quality metrics are from one another.  It is easy to imagine that there is one common factor driving cast, critic score and gross (some single 'awesomeness' factor). Here is a simple chart that provides an answer.
+
+```{r echo=FALSE, Multidimensional_Proof, fig.width = 12, fig.height = 3, htmlcap = "Fig. 16: The cross-sections of cast tiers, critic score tiers and log10 total gross."}
+
+ggplot(aes(x = cast_tier, y = gross, color = critic_tier), 
+       data = na.omit(unique(movie_df[relative_week == 1,
+                                      list(critic_tier, cast_tier, gross)]))) + 
+  geom_boxplot(position = 'dodge') +
+  scale_y_log10() +
+  ggtitle('Looking for "Awesomeness"') +
+  ylab('log10(gross)')
+  
+```
+
+Looking at the above, I notice that the relationship with gross is essentially monotonic across casting tier and across critic tier.  If cast tier and critic tier captured the same exact information about gross, we would not observe monotonicity with gross along both dimensions. Clearly, the measures examined here are different (though this does not preclude a better representation using some latent factor...work for another time).
+
+### Seasonality and Other Films
+
+```{r echo=FALSE, Multidimensional_Proof, fig.width = 12, fig.height = 3, htmlcap = "Fig. 17: The cross-sections of cast tiers, critic score tiers and total gross."}
+
+# build seasonal factors for release dates
+movie_df[between(release_date,
+                 as.Date(paste(year,5,16,sep = '-')),
+                 as.Date(paste(year,8,15,sep = '-'))),
+         season := 'Summer']
+
+movie_df[between(release_date,
+                 as.Date(paste(year,8,16,sep = '-')),
+                 as.Date(paste(year,11,15,sep = '-'))),
+         season := 'Fall']
+
+movie_df[between(release_date,
+                 as.Date(paste(year,2,16,sep = '-')),
+                 as.Date(paste(year,5,15,sep = '-'))),
+         season := 'Spring']
+
+movie_df[between(release_date,
+                 as.Date(paste(year,11,16,sep = '-')),
+                 as.Date(paste(year,12,31,sep = '-'))) |
+         between(release_date,
+                 as.Date(paste(year,1,1,sep = '-')),
+                 as.Date(paste(year,2,15,sep = '-'))),
+         season := 'Winter']
+
+#build competition tier factor
+comp_tier <- make_tier(movie_df, 'comp_week_theaters', qtiles)
+# fix name for intelgibility
+setnames(comp_tier,'comp_week_theaters_tier','comp_tier')
+#add competition tier to main data set
+movie_df <- merge(movie_df, comp_tier, by = 'title')
+
+movie_df[,cum_comp_theaters:= mean(comp_week_critics, na.rm = T), by = title]
+
+ggplot(aes(x = season, y = weekly_gross, color = comp_tier), 
+       data = na.omit(
+         unique(movie_df[relative_week == 1,list(season, comp_tier, weekly_gross)]))
+       ) + 
+  geom_boxplot(position = 'dodge') +
+  #coord_cartesian(ylim = gross_range) +
+  scale_y_log10()
+
+
+```
+
+
 # Multivariate Exploration
-
-Given the importance of novelty (the relative week of release), it makes sense to continue examining our key metrics along those lines.  We can 
-
 
 ### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
 
@@ -940,6 +1112,10 @@ Given the importance of novelty (the relative week of release), it makes sense t
 
 ### Plot One
 ```{r echo=FALSE, Plot_One}
+
+ggplot(aes(x = critic_tier, y = talent_cum_pics, color = gross_tier), data = unique(movie_df[!is.na(critic_tier) & !is.na(open_tier), list(talent_cum_pics,open_tier,critic_tier,gross_tier)])) +
+  geom_boxplot(position = 'dodge')
+
 
 ```
 
