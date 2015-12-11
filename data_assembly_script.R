@@ -5,9 +5,10 @@ setwd("~/../version-control/Film-EDA")  # set my working directory
 graphics.off() # close charts
 rm(list = ls(all = TRUE))
 
-setwd("~/../version-control/Film-EDA")  # set my working directory
-source(paste(getwd(), 
-             '/data_assembly_utilities.R', sep = ''))#load additional functions
+# set my working directory
+setwd("~/../version-control/Film-EDA")
+#load additional functions
+source(paste(getwd(), '/data_assembly_utilities.R', sep = ''))
 
 library(parallel)
 library(rvest)
@@ -47,8 +48,11 @@ mojo_links <- mojo_links[open_date > '2003-11-18' & !is.na(open_date), ]
 #parallelized scraping of each boxoffice mojo individual movie page
 cl <- makePSOCKcluster(7, outfile="")
 registerDoParallel(cl)
-movie_data_list <- foreach(i = 1:dim(mojo_links)[1], .init = NULL,
-                           .errorhandling = 'remove', .verbose = TRUE, .combine = c,
+movie_data_list <- foreach(i = 1:dim(mojo_links)[1], 
+                           .init = NULL,
+                           .errorhandling = 'remove', 
+                           .verbose = TRUE, 
+                           .combine = c,
                            .export = c('get_box_from_b_tags',
                                        'get_talent_from_td_tags',
                                        'build_historic',
@@ -88,7 +92,9 @@ while(i < length(movie_data_list) + 1){
 }
 
 #write to boxoffice mojo json doc (intermediate step)
-lapply(1:length(movie_data_list), write_list, movie_data_list,
+lapply(1:length(movie_data_list), 
+       write_list, 
+       movie_data_list,
        'boxoffice_mojo_data.json')
 
 #reload json doc
@@ -105,7 +111,9 @@ closeAllConnections()
 json_with_critics <- lapply(movie_json_list, add_metacritic_to_json_row)
 
 #write to json doc (intermediate step)
-lapply(1:length(json_with_critics), write_list, json_with_critics,
+lapply(1:length(json_with_critics), 
+       write_list, 
+       json_with_critics,
        'boxoffice_mojo_data_with_critics.json')
 
 #######################################################
@@ -140,8 +148,15 @@ actors_wide <- as(actors_wide, 'itemMatrix')
 
 #builds list of 'rules'; pairs of actors that worked together 
 rules <- apriori(actors_wide, 
-                 parameter = list(minlen = 2, maxlen = 2, support = 0, confidence = .001))
-rules_vec <- labels(rules, itemSep = " + ", setStart = "", setEnd = "", ruleSep = " --- ")
+                 parameter = list(minlen = 2, 
+                                  maxlen = 2, 
+                                  support = 0, 
+                                  confidence = .001))
+rules_vec <- labels(rules, 
+                    itemSep = " + ", 
+                    setStart = "", 
+                    setEnd = "", 
+                    ruleSep = " --- ")
 
 #parallelized build of actor pairs frame for igraph
 cl <- makePSOCKcluster(7, outfile="")
@@ -186,8 +201,11 @@ setkey(actor_data, name)
 
 #attach graph measures to individual film data
 film_actor_list <- lapply(movie_with_critics_json_list, 
-                          attach_actor_data, actor_data)
+                          attach_actor_data, 
+                          actor_data)
 
 #write to json doc
-lapply(1:length(film_actor_list), write_list, film_actor_list,
+lapply(1:length(film_actor_list), 
+       write_list, 
+       film_actor_list,
        'boxoffice_mojo_metacritic_merge.json')
