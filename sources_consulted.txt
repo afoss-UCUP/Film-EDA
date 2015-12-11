@@ -1,0 +1,43 @@
+Sources Consulted
+
+Plotting with ggplot2
+http://docs.ggplot2.org/
+http://stackoverflow.com/questions/13649473/add-a-common-legend-for-combined-ggplots
+http://yutannihilation.github.io/allYourFigureAreBelongToUs/ggally/ggscatmat/
+http://stackoverflow.com/questions/24135157/arranging-ggally-plots-with-gridextra
+http://stackoverflow.com/questions/21878974/auto-wrapping-of-labels-via-labeller-label-wrap-in-ggplot2
+http://stackoverflow.com/questions/19876505/boxplot-show-the-value-of-mean
+http://rpackages.ianhowson.com/cran/GGally/man/print.ggpairs.html
+https://cran.r-project.org/web/packages/GGally/index.html
+http://www.cookbook-r.com/Graphs/Facets_(ggplot2)/
+http://rpackages.ianhowson.com/cran/GGally/man/ggscatmat.html
+https://stat.ethz.ch/R-manual/R-devel/library/grid/doc/plotexample.pdf
+http://www.cookbook-r.com/Graphs/Legends_(ggplot2)/
+
+Rmarkdown & Knitr
+http://stackoverflow.com/questions/15385696/how-to-adjust-the-output-width-of-rstudio-markdown-output-to-html
+http://stackoverflow.com/questions/15010732/caption-in-the-html-output-of-knitr
+http://rmarkdown.rstudio.com/html_document_format.html
+http://pandoc.org/README.html
+http://www.w3schools.com/html/default.asp
+http://yihui.name/knitr/options/#chunk_options
+https://www.sharelatex.com/learn/Knitr#Chunks_of_code
+http://daringfireball.net/projects/markdown/syntax
+http://www.rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf
+
+Other R-related
+http://www.personality-project.org/r/html/misc.html
+http://igraph.org/r/
+http://stackoverflow.com/questions/10602433/how-to-escape-a-question-mark-in-r
+
+Idea Generation & Requirements
+https://s3.amazonaws.com/udacity-hosted-downloads/ud651/GeographyOfAmericanMusic.html
+https://s3.amazonaws.com/udacity-hosted-downloads/ud651/AtlanticHurricaneTracking.html
+https://docs.google.com/document/d/1-f3wM3mJSkoWxDmPjsyRnWvNgM57YUPloucOIl07l4c/pub
+https://github.com/allanbreyes/udacity-data-science/tree/master/p3
+https://docs.google.com/document/d/1L2Wwofs6D8Crd0QLZ1-RxBHlVoBZ3mec2xWgxrmUs5I/pub?embedded=true
+https://github.com/alexperrier/datatalks/blob/master/drivendata/blooddonation/exploration.R
+
+Data
+http://www.boxofficemojo.com/
+http://www.metacritic.com/
