@@ -30,6 +30,9 @@ library(gridExtra)
 library(knitr)
 library(GGally)
 library(RColorBrewer)
+library(memisc)
+library(psych)
+library(scales)
 
 setwd("~/../version-control/Film-EDA")  # set my working directory
 source(paste(getwd(), '/eda_assist_functions.R', sep = ''))#loads functions
@@ -40,8 +43,8 @@ source(paste(getwd(), '/eda_assist_functions.R', sep = ''))#loads functions
 # Load the Data
 
 # This will generate a list fo json docs rather than a data frame.  
-# The structure is a little more flexible and allows for less sparsity.  
-# Specific analyses may prepare different data frames as needed and will be noted
+# The structure is a little more flexible and allows for less sparsity. Specific 
+# analyses may prepare different data frames as needed and will be noted
 file <- 'boxoffice_mojo_metacritic_merge.json'
 con = file(file, "r")
 movie_data <- readLines(con, -1L)
@@ -68,11 +71,6 @@ movie_df <- movie_df[release_date > '2003-10-31', ]
 movie_df$week <- factor(movie_df$week,
                         levels = sort(levels(movie_df$week)), ordered = F)
 
-# #coerce release_mo_wk to ordered variable
-# movie_df$release_mo_wk <- factor(movie_df$release_mo_wk,
-#                                  levels = sort(levels(movie_df$release_mo_wk)),
-#                                  ordered = T)
-
 # coerce rating to ordered variable
 movie_df$mpaa_rating <- factor(movie_df$mpaa_rating,
                                  levels = c('G',
@@ -83,7 +81,7 @@ movie_df$mpaa_rating <- factor(movie_df$mpaa_rating,
                                             'Unrated', 
                                             'Not Yet Rated',
                                             'Unknown'), 
-                               ordered = T)
+                               ordered = F)
 
 # order data for faster searches
 setkey(movie_df, title, relative_week)
@@ -108,13 +106,18 @@ movie_df[, daily_theater_eff := weekly_gross / (weekly_theaters * weekly_days)]
 
 # make relative weekly competition variables (gross, critics and theaters)
 # of other film attributes in a particular year/week
-movie_df[, comp_week_gross := sum(weekly_gross), by = list(year, week)]
+movie_df[, comp_week_gross := sum(weekly_gross),
+         by = list(year, week)]
 movie_df[, comp_week_gross := comp_week_gross - weekly_gross]
-movie_df[, comp_week_critics := sum(critics_avg, na.rm = T), by = list(year, week)]
+
+movie_df[, comp_week_critics := sum(critics_avg, na.rm = T),
+         by = list(year, week)]
 movie_df[, comp_week_critics := comp_week_critics - critics_avg]
-movie_df[, comp_week_theaters := sum(weekly_theaters, na.rm = T),by = list(year, week)]
+
+movie_df[, comp_week_theaters := sum(weekly_theaters, na.rm = T),
+         by = list(year, week)]
 movie_df[, comp_week_theaters := comp_week_theaters - weekly_theaters]
-# summary(m1 <- lm((weekly_gross)/gross~as.numeric(weekly_theaters/cum_theaters)+rel_week_cash+(rel_week_critics)+critics_avg+release_mo_wk, data = movie_df[cum_theaters>1,]))
+
 
 ```
 
@@ -151,43 +154,25 @@ To understand efficiency, I'll also have to drill into its components: gross and
 # long tails and keep the view focused on the bulk of data
 
 #find chart range and plot weekly gross
-gross_range <- get_chart_range(movie_df, 'weekly_gross', .01, .975)
-p1 <- ggplot(aes(x = weekly_gross), data = movie_df) +
-  geom_bar(binwidth = 250000, fill = 'navyblue') +
-  coord_cartesian(xlim = c(gross_range))
+gross_range <- get_chart_range(movie_df, 'weekly_gross', .01, .995)
+p1 <- uni_plot(movie_df, 'weekly_gross', gross_range, F)
 
 #find chart range and plot weekly theaters
-theater_range <- get_chart_range(movie_df, 'weekly_theaters', .01, .99)
-p2 <- ggplot(aes(x = weekly_theaters), data = movie_df) +
-  geom_bar(binwidth = 100, fill = 'navyblue') +
-  coord_cartesian(xlim = c(theater_range))
+theater_range <- get_chart_range(movie_df, 'weekly_theaters', .01, .995)
+p2 <- uni_plot(movie_df, 'weekly_theaters', theater_range, F)
 
 #find chart range and plot daily theater efficiency
-eff_range <- get_chart_range(movie_df, 'daily_theater_eff', .01, .99)
-p3 <- ggplot(aes(x = daily_theater_eff), data = movie_df) +
-  geom_bar(binwidth = 100, fill = 'navyblue') +
-  coord_cartesian(xlim = c(eff_range))
+eff_range <- get_chart_range(movie_df, 'daily_theater_eff', .01, .995)
+p3 <- uni_plot(movie_df, 'daily_theater_eff', eff_range, F)
 
 # log transform weekly gross plot
-p4 <- ggplot(aes(x = weekly_gross), data = movie_df[!is.na(weekly_gross), ]) +
-  geom_bar(binwidth = .2, fill = 'navyblue') +
-  scale_x_log10() +
-  coord_cartesian(xlim = c(gross_range)) +
-  xlab('log10(weekly_gross)')
+p4 <- uni_plot(movie_df, 'weekly_gross', gross_range, T)
 
 # log transform weekly theater plot
-p5 <- ggplot(aes(x = weekly_theaters), data = movie_df) +
-  geom_bar(binwidth = .1, fill = 'navyblue') +
-  scale_x_log10() +
-  coord_cartesian(xlim = c(theater_range)) +
-  xlab('log10(weekly_theaters)')
+p5 <- uni_plot(movie_df, 'weekly_theaters', theater_range, T)
 
 # log transform daily theater efficiency plot
-p6 <- ggplot(aes(x = daily_theater_eff), data = movie_df) +
-  geom_bar(binwidth = .1, fill = 'navyblue') +
-  scale_x_log10() +
-  coord_cartesian(xlim = c(eff_range)) +
-  xlab('log10(daily_theater_eff)')
+p6 <- uni_plot(movie_df, 'daily_theater_eff', eff_range, T)
 
 grid.arrange(p1, p2, p3, p4, p5, p6, ncol = 3,
              top = "Key Metrics for Weekly Film Performance")
@@ -199,7 +184,7 @@ rm(p1, p2, p3, p4, p5, p6)
 A couple thoughts:
 
 * All of these look like they are potnetially exponential distributions that would benefit from a log transform when analyzing
-* Weekly gross and weekly theaters have interesting bi-modal distributions once log transformed.
+* Weekly gross and weekly theaters have interesting bi-modal distributions once log transformed (we'll see evidence of why in the multivariate part)
 
 ## Potential Associated Measures
 
@@ -237,9 +222,9 @@ p9 <- ggplot(aes(x = mpaa_rating), data = rating_dat[!is.na(mpaa_rating), ]) +
 #generate runtime by movie releases
 runtime_dat <- unique_films(movie_df, 'runtime')
 
-#plot runtime
-p10 <- ggplot(aes(x = runtime), data = runtime_dat[!is.na(runtime), ]) +
-  geom_bar(binwidth = 2, fill = 'navyblue')
+#find range and plot runtime
+run_range <- get_chart_range(runtime_dat, 'runtime', 0, 1)
+p10 <- uni_plot(runtime_dat, 'runtime', run_range, F)
 
 grid.arrange(p7, p8, p9, p10, nrow = 2, top = 'Simple Descriptive Measures')
 
@@ -286,23 +271,24 @@ Other meaningful measures are a little harder to wrap one's head around.  Qualit
 
 # plot critics_avg scores from unique films
 critics_avg_dat <- unique_films(movie_df, 'critics_avg')
-p11 <- ggplot(aes(x = critics_avg), data = critics_avg_dat) +
-  geom_bar(binwidth = 2, fill = 'navyblue')
-  
+crit_range <- get_chart_range(critics_avg_dat, 'critics_avg', 0, 1)
+p11 <- uni_plot(critics_avg_dat, 'critics_avg', crit_range, F)
+
+
 # plot count_critic scores from unique films
 count_critics_dat <- unique_films(movie_df, 'count_critics')
-p12 <- ggplot(aes(x = count_critics), data = count_critics_dat) +
-  geom_bar(binwidth = 1, fill = 'navyblue')
+count_crit_range <- get_chart_range(count_critics_dat, 'count_critics', 0, 1)
+p12 <- uni_plot(count_critics_dat, 'count_critics', count_crit_range, F)
 
 # plot critic_IQR scores from unique films
 critics_IQR_dat <- unique_films(movie_df, 'critics_IQR')
-p13 <- ggplot(aes(x = critics_IQR), data = critics_IQR_dat) +
-  geom_bar(binwidth = 2, fill = 'navyblue')
+critics_IQR_range <- get_chart_range(critics_IQR_dat, 'critics_IQR', 0, 1)
+p13 <- uni_plot(critics_IQR_dat, 'critics_IQR', critics_IQR_range, F)
 
 ##plot audience_avg scores from unique films
 audience_avg_dat <- unique_films(movie_df, 'audience_avg')
-p14 <- ggplot(aes(x = audience_avg), data = audience_avg_dat) +
-  geom_bar(binwidth = 1, fill = 'navyblue')
+audience_avg_range <- get_chart_range(audience_avg_dat, 'audience_avg', 0, 1)
+p14 <- uni_plot(audience_avg_dat, 'audience_avg', audience_avg_range, F)
 
 grid.arrange(p11, p12, p13, p14, nrow = 2,
              top = 'Critic and Audience Approval Measures')
@@ -315,7 +301,7 @@ Again, some observations:
 
 * These all seem fairly well behaved
 * Audience scores and critic counts may be a little skewed, but these distributions have a nice shape to them without any manipulation  
-* The citics interquartile range (critics_IQR) chart may be bi-modal, which would be interesting and would foot with the idea that there are two classes of films: controversial and non-controversial. I'm not cetain I have a good way to examine that item yet
+
 
 ### Quality Measures - Cast
 
@@ -326,44 +312,26 @@ Cast may also have a lot to do with quality and, hence, daily theater efficiency
 #find range and plot cumulative cast pictures
 pics_dat <- unique_films(movie_df, 'talent_cum_pics')
 pics_range <- get_chart_range(pics_dat, 'talent_cum_pics', 0, .99)
-p15 <- ggplot(aes(x = talent_cum_pics), data = pics_dat) +
-  geom_bar(binwidth = 5, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(pics_range))
+p15 <- uni_plot(pics_dat,'talent_cum_pics', pics_range, F)
 
 #find range and plot cumulative cast degree
 deg_dat <- unique_films(movie_df, 'talent_cum_deg')
 deg_range <- get_chart_range(deg_dat, 'talent_cum_deg', .01, .99)
-p16 <- ggplot(aes(x = talent_cum_deg), data = deg_dat) +
-  geom_bar(binwidth = 25, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(deg_range))
+p16 <- uni_plot(deg_dat,'talent_cum_deg', deg_range, F)
 
 #find range and plot cumulative cast betweeness
 bet_dat <- unique_films(movie_df, 'talent_cum_bet')
 bet_range <- get_chart_range(bet_dat, 'talent_cum_bet', .01, .99)
-p17 <- ggplot(aes(x = talent_cum_bet), data = bet_dat) +
-  geom_bar(binwidth = 2500, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(bet_range))
+p17 <- uni_plot(bet_dat,'talent_cum_bet', bet_range, F)
  
 #plot log cumulative cast pics
-p18 <- ggplot(aes(x = talent_cum_pics), data = pics_dat) +
-  geom_bar(binwidth = .025, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(pics_range)) +
-  scale_x_log10() +
-  xlab('log10(talent_cum_pics)')
+p18 <- uni_plot(pics_dat,'talent_cum_pics', pics_range, T)
 
 #plot log cumulative cast degrees
-p19 <- ggplot(aes(x = talent_cum_deg), data = deg_dat) +
-  geom_bar(binwidth = .025, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(deg_range)) +
-  scale_x_log10() +
-  xlab('log10(talent_cum_deg)')
+p19 <- uni_plot(deg_dat,'talent_cum_deg', deg_range, T)
 
 #plot log cumulative cast betweeness
-p20 <- ggplot(aes(x = talent_cum_bet), data = bet_dat) +
-  geom_bar(binwidth = .05, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(bet_range)) +
-  scale_x_log10() +
-  xlab('log10(talent_cum_bet)')
+p20 <- uni_plot(bet_dat,'talent_cum_bet', bet_range, T)
 
 grid.arrange(p15, p16, p17, p18, p19, p20, nrow = 2, 
              top = 'Cumulative Cast Measures')
@@ -384,28 +352,25 @@ Finally, competition may have something to do with a film's performance. In any 
 ```{r echo = FALSE, Competition, fig.width = 12, fig.height = 3, htmlcap = 'Fig. 5: Gross competative box office, cumulative competative critic scores,<br>and cumulative competative theater counts for a given year and week.'}
 
 #find range and plot competition weekly gross
-box_weeks <- movie_df[, list(comp_box = sum(weekly_gross, na.rm = T)),
+box_weeks <- movie_df[, list(comp_box = 
+                               sum(weekly_gross, na.rm = T)),
                          by = list(year, week)]
-comp_box_range <- get_chart_range(box_weeks, 'comp_box', .01, .95)
-p21 <- ggplot(aes(x = comp_box), data = box_weeks) +
-  geom_bar(binwidth = 10000000, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(comp_box_range))
+comp_box_range <- get_chart_range(box_weeks,'comp_box', .01, .99)
+p21 <- uni_plot(box_weeks,'comp_box', comp_box_range, F)
 
 #find range and plot competition critic scores
-critic_weeks <- movie_df[,list(comp_critic = sum(critics_avg, na.rm = T)),
+critic_weeks <- movie_df[,list(comp_critic = 
+                                 sum(critics_avg, na.rm = T)),
                              by = list(year, week)]
 comp_critic_range <- get_chart_range(critic_weeks, 'comp_critic', .01, .99)
-p22 <- ggplot(aes(x = comp_critic), data = critic_weeks) +
-  geom_bar(binwidth = 100, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(comp_critic_range))
+p22 <- uni_plot(critic_weeks,'comp_critic', comp_critic_range, F)
 
 #find range and plot competition theaters
-theater_weeks <- movie_df[,list(comp_theater = sum(weekly_theaters, na.rm = T)),
+theater_weeks <- movie_df[,list(comp_theater = 
+                                  sum(weekly_theaters, na.rm = T)),
                           by = list(year, week)]
 comp_theater_range <- get_chart_range(theater_weeks, 'comp_theater', .01, .99)
-p23 <- ggplot(aes(x = comp_theater), data = theater_weeks) +
-  geom_bar(binwidth = 1000, fill = 'navyblue') + 
-  coord_cartesian(xlim = c(comp_theater_range))
+p23 <- uni_plot(theater_weeks,'comp_theater', comp_theater_range, F)
 
 grid.arrange(p21, p22, p23, nrow = 1, top = 'Competative Measures')
 
@@ -420,50 +385,82 @@ Thoughts on competition:
 
 # Bivariate Exploration
 
-## Novelty / Recency
+## The Single Most Important Factor: Novelty / Recency
 
-New releases are a big deal. It is pretty easy to see what I mean by plotting our key film metrics (weekly gross, weekly theaters, daily theater eff) by week of a film's release. We'll see that the early weeks of a film's release dominate grosses and theater counts. Given what we learned about the shape of the distributions before, I show them all log transformed. I limit the scope to the first two months of release and plot the median and correlation so that we'll get a sense for the linear relationship. Relative week was omitted from univariate analysis as it would have been nonsensical.
+New releases are a big deal. It is pretty easy to see what I mean by plotting our key film metrics (weekly gross, weekly theaters, daily theater eff) by week of a film's release. We'll see that the early weeks of a film's release dominate grosses and theater counts. Given what we learned about the shape of the distributions before, I show them all log transformed. I limit the images to the first ten weeks of release and plot the median and correlation so that we'll get a sense for the linear relationship. Relative week was omitted from univariate analysis as it would have been nonsensical.
+
+First, however, I want to find the most linear representation of my key features and relative week to plot.
+
+```{r echo=FALSE}
+
+# this builds a lower triangle correlation matrix
+# I rename the variables to get them to fit without wrapping
+lowerCor(movie_df[, list(
+  wk_grs = weekly_gross, 
+  wk_th = weekly_theaters,
+  d_th_eff = daily_theater_eff,
+  l_wk_grs = log10(weekly_gross), 
+  l_wk_th = log10(weekly_theaters),
+  l_d_th_eff = log10(daily_theater_eff),
+  r_wk = relative_week,
+  l_r_wk = log10(relative_week),
+  sr_r_wk = sqrt(relative_week)
+  )], use = 'complete')
+
+```
+
+To my eyes, it looks like log10 transforms work best for relative week, weekly gross and daily theater efficiency and standard form works best for theaters.
 
 ```{r echo=FALSE, Novelty_Plots, fig.width = 12, fig.height = 4, htmlcap = "Fig. 6: Weekly domestic box office, weekly theater counts and daily theater efficiency<br>log10 transformed and plotted by relative week of a film's release. Correlation overlaid in black."}
 
 #make correlation note
-c1 <- plot_cor(movie_df[, log10(weekly_gross)], movie_df[, relative_week])
+c1 <- plot_cor(movie_df[, log10(weekly_gross)], 
+               movie_df[, log10(relative_week)])
 
 #plot log weekly gross vs relative week
 p24 <- ggplot(aes(x = relative_week, y = weekly_gross),
               data = movie_df[!is.na(weekly_gross), ]) +
-  geom_point(alpha = .25, position = position_jitter(h = 0), color = 'navyblue') +
-  coord_cartesian(xlim = c(.5, 8.5)) +
+  geom_point(alpha = .10,
+             position = position_jitter(w = .15),
+             color = 'navyblue') +
+  coord_cartesian(xlim = c(.5, 11.5)) +
   geom_line(stat = 'summary', fun.y = 'median', size = 1) +
   scale_y_log10() +
+  scale_x_log10() +
   ylab('log10(weekly_gross)') +
-  geom_text(data = NULL, x = 6, y = 8, label = c1, size = 4)
+  geom_text(data = NULL, x = 0, y = 3, label = c1, size = 4)
 
 
 #make correlation note
-c2 <- plot_cor(movie_df[, log10(weekly_theaters)], movie_df[, relative_week])
+c2 <- plot_cor(movie_df[, weekly_theaters],
+               movie_df[, log10(relative_week)])
 
 #plot log weekly theaters vs relative week
 p25 <- ggplot(aes(x = relative_week, y = weekly_theaters),
               data = movie_df[!is.na(weekly_theaters), ]) +
-  geom_point(alpha = .25, position = position_jitter(h = 0), color = 'navyblue') +
-  coord_cartesian(xlim = c(.5, 8.5)) +
+  geom_point(alpha = .10,
+             position = position_jitter(w = .15),
+             color = 'navyblue') +
+  coord_cartesian(xlim = c(.5, 11.5)) +
   geom_line(stat = 'summary', fun.y = 'median', size = 1) +
-  scale_y_log10() +
-  ylab('log10(weekly_theaters)') +
-  geom_text(data = NULL, x = 3, y = 1, label = c2, size = 4)
+  scale_x_log10() +
+  geom_text(data = NULL, x = 0, y = 500, label = c2, size = 4)
 
 #make correlation note
-c3 <- plot_cor(movie_df[, log10(daily_theater_eff)], movie_df[, relative_week])
+c3 <- plot_cor(movie_df[, log10(daily_theater_eff)],
+               movie_df[, log10(relative_week)])
 
 p26 <- ggplot(aes(x = relative_week, y = daily_theater_eff),
               data = movie_df[!is.na(daily_theater_eff), ]) +
-  geom_point(alpha = .25, position = position_jitter(h = 0), color = 'navyblue') +
-  coord_cartesian(xlim = c(.5, 8.5)) +
+  geom_point(alpha = .10,
+             position = position_jitter(w = .15),
+             color = 'navyblue') +
+  coord_cartesian(xlim = c(.5, 11.5)) +
   geom_line(stat = 'summary', fun.y = 'median', size = 1) +
   scale_y_log10() +
+  scale_x_log10() +
   ylab('log10(daily_theater_eff)') +
-  geom_text(data = NULL, x = 6, y = 4.5, label = c3, size = 4)
+  geom_text(data = NULL, x = 0, y = 1, label = c3, size = 4)
 
 grid.arrange(p24, p25, p26, nrow = 1, 
              top = 'Key Film Metrics by Relative Week of Release')
@@ -480,59 +477,79 @@ Some observations:
 * There is not much change between theater counts during the first and second weeks of a film's release. This is possibly an artifact of how distribution is contracted: distributors and theater chains typically have an agreement on the number of screens for the first two weeks of a film's release
 * Daily theater efficiency is the least linearly related to relative week - perhaps this is because we remove some of the relationship during construction (weekly theaters are have a substantial relationship with relative week and we're dividing that out of the weekly gross)
 
-## Box Office Seasonality
+## Categorical Variables
+
+### Box Office Seasonality
 
 I mentioned earlier on that seasonality measured by relative week of release would be important.  I provide my evidence in the following plots. I plot individual film weeks (top row) and the aggregates we calculated for our competative measures (bottom). While we only have 12 years of data for the aggregates, there are some clear trends.
 
 ```{r echo=FALSE, Seasonal_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 7: Weekly domestic box office, weekly theater counts and critic averages.<br>Individual films (top) and competative aggregates (bottom) plotted by week of year. Green dot denotes an average, blue bar is median."}
 
 #find chart range and plot weekly gross
-week_gross_range <- get_chart_range(movie_df, 'weekly_gross', .01, .95)
+week_gross_range <- get_chart_range(movie_df,
+                                    'weekly_gross',
+                                    .01,
+                                    .95)
 p27 <- ggplot(aes(x = week, y = weekly_gross), 
               data = movie_df[!is.na(weekly_gross), ]) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = week_gross_range) +
   stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen') + 
-  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+  scale_x_discrete(breaks = seq(week_range[1]-1, week_range[2], 10))
 
 #find chart range and plot weekly_theaters
-week_theater_range <- get_chart_range(movie_df, 'weekly_theaters', .01, .99)
+week_theater_range <- get_chart_range(movie_df,
+                                      'weekly_theaters',
+                                      .01,
+                                      .99)
 p28 <- ggplot(aes(x = week, y = weekly_theaters), 
               data = movie_df[!is.na(weekly_theaters), ]) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = week_theater_range) +
   stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen') + 
-  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+  scale_x_discrete(breaks = seq(week_range[1]-1, week_range[2], 10))
 
 #find chart range and plot critic_avg during week of release by week
-week_critic_range <- get_chart_range(movie_df, 'critics_avg', .01, .99)
+week_critic_range <- get_chart_range(movie_df,
+                                     'critics_avg',
+                                     .01,
+                                     .99)
 p29 <- ggplot(aes(x = week, y = critics_avg), 
               data = movie_df[!is.na(critics_avg), ]) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = week_critic_range) +
   stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen') + 
-  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+  scale_x_discrete(breaks = seq(week_range[1]-1, week_range[2], 10))
 
 #find chart range and plot critic_avg during week of release by week
-comp_box_range <- get_chart_range(box_weeks, 'comp_box', .005, .995)
+comp_box_range <- get_chart_range(box_weeks, 
+                                  'comp_box',
+                                  .005,
+                                  .995)
 p30 <- ggplot(aes(x = week, y = comp_box), data = box_weeks) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = comp_box_range) + 
-  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+  scale_x_discrete(breaks = seq(week_range[1]-1, week_range[2], 10))
 
 #find chart range and plot critic_avg during week of release by week
-comp_theater_range <- get_chart_range(theater_weeks, 'comp_theater', .005, .995)
+comp_theater_range <- get_chart_range(theater_weeks, 
+                                      'comp_theater',
+                                      .005,
+                                      .995)
 p31 <- ggplot(aes(x = week, y = comp_theater), data = theater_weeks) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = comp_theater_range) + 
-  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+  scale_x_discrete(breaks = seq(week_range[1]-1, week_range[2], 10))
 
 #find chart range and plot critic_avg during week of release by week
-comp_critic_range <- get_chart_range(critic_weeks, 'comp_critic', .005, .995)
+comp_critic_range <- get_chart_range(critic_weeks,
+                                     'comp_critic',
+                                     .005,
+                                     .995)
 p32 <- ggplot(aes(x = week, y = comp_critic), data = critic_weeks) +
   geom_boxplot(color = 'navyblue') +
   coord_cartesian(ylim = comp_critic_range) + 
-  scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
+  scale_x_discrete(breaks = seq(week_range[1]-1, week_range[2], 10))
 
 grid.arrange(p27, p28, p29, p30, p31, p32, nrow = 2,
              top = 'Seasonal Impact: Individual Films and Competative Aggregates')
@@ -549,7 +566,7 @@ A few things worth mentioning:
 * An interesting story is told by our critics, which foots with popular notions of the film calendar: during Summer, quality is high for the few blockbuster films released (high average scores, low competative aggregates), whereas late Fall is a period of higher average critic scores and normal levels in aggregate scores, so a higher than usual number of 'Oscar-bait' quality films are out
 * Late Summer/early Fall see low boxoffice on an individual and aggregate basis with high theater counts and low individual critic averages - this means a large number of pretty bad films are in theaters and daily theater efficiency should be lower
 
-## Film Category: Genre and Rating
+### Genre and Rating
 
 I want to take a little time to look into performance by genre and rating.  I have a sense that it matters - certainly the prevalence of large G-rated computer animated films and Summer PG-13-rated superhero flicks makes me think it should be relavent.  I plot the key metrics against genre and rating below.
 
@@ -557,7 +574,9 @@ I want to take a little time to look into performance by genre and rating.  I ha
 
 #add grosses to top genres
 gross_dat <- unique_films(movie_df, 'gross')
-genre_gross_dat <- merge(genres_dat, gross_dat, by = 'title')
+genre_gross_dat <- merge(genres_dat,
+                         gross_dat,
+                         by = 'title')
 
 # plot grosses for top genres
 genre_gross_range <- get_chart_range(genre_gross_dat, 'gross', .01, .99)
@@ -570,7 +589,9 @@ p33 <- ggplot(aes(y = gross, x = genre),
 
 #add cumulative theaters to top genres
 cum_theater_dat <- unique_films(movie_df, 'cum_theaters')
-genre_theater_dat <- merge(genres_dat, cum_theater_dat, by = 'title')
+genre_theater_dat <- merge(genres_dat,
+                           cum_theater_dat,
+                           by = 'title')
 
 # find range and plot total theaters for top genres
 genre_theater_range <- get_chart_range(genre_theater_dat, 
@@ -584,7 +605,10 @@ p34 <- ggplot(aes(y = cum_theaters, x = genre),
 
 # build genre efficiency measure (to keep consistant, 
 # multiplied by 6 as each theater is a week)
-genre_eff_dat <- merge(genre_gross_dat, genre_theater_dat, by = c('title', 'genre'))
+genre_eff_dat <- merge(genre_gross_dat,
+                       genre_theater_dat,
+                       by = c('title', 'genre'))
+
 genre_eff_dat[, daily_theater_eff:= gross / (cum_theaters * 6)]
 
 # find range and plot efficiencies for top genres
@@ -598,7 +622,9 @@ p35 <- ggplot(aes(y = daily_theater_eff, x = genre),
   stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
 
 #make unique rating data
-rating_gross_dat <- merge(rating_dat, gross_dat, by = 'title')
+rating_gross_dat <- merge(rating_dat,
+                          gross_dat,
+                          by = 'title')
 
 # plot grosses for top ratings
 rating_gross_range <- get_chart_range(rating_gross_dat, 'gross', .01, .99)
@@ -609,7 +635,9 @@ p36 <- ggplot(aes(y = gross, x = mpaa_rating),
   stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
 
 #add cumulative theaters to top ratings
-rating_theater_dat <- merge(rating_dat, cum_theater_dat, by = 'title')
+rating_theater_dat <- merge(rating_dat,
+                            cum_theater_dat,
+                            by = 'title')
 
 # find range and plot total theaters for top ratings
 rating_theater_range <- get_chart_range(rating_theater_dat, 
@@ -622,17 +650,18 @@ p37 <- ggplot(aes(y = cum_theaters, x = mpaa_rating),
 
 # build rating efficiency measure (to keep consistant, 
 # multiplied by 6 as each theater is a week)
-rating_eff_dat <- merge(rating_gross_dat, rating_theater_dat,
+rating_eff_dat <- merge(rating_gross_dat,
+                        rating_theater_dat,
                         by = c('title', 'mpaa_rating'))
+
 rating_eff_dat[, daily_theater_eff:= gross / (cum_theaters * 6)]
 
 # find range and plot efficiencies for top ratings
-rating_eff_range <- get_chart_range(rating_eff_dat, 
-                                   'daily_theater_eff', .01, .99)
+rat_eff_range <- get_chart_range(rating_eff_dat, 'daily_theater_eff', .01, .99)
 p38 <- ggplot(aes(y = daily_theater_eff, x = mpaa_rating),
              data = rating_eff_dat) +
   geom_boxplot(color = 'navyblue') +
-  coord_cartesian(ylim = rating_eff_range) +
+  coord_cartesian(ylim = rat_eff_range) +
   stat_summary(fun.y=mean, geom="point", size=2, color = 'darkgreen')
 
 grid.arrange(p33, p34, p35, p36, p37, p38, nrow = 2,
@@ -640,7 +669,6 @@ grid.arrange(p33, p34, p35, p36, p37, p38, nrow = 2,
 
 #clean plots from memory (they're big)
 rm(p33, p34, p35, p36, p37, p38)
-
 
 ```
 
@@ -657,6 +685,8 @@ Given our discovery that effeciency is not consistent across genres while it is 
 
 ```{r echo = FALSE, Category_Cross, fig.width = 12, fig.height = 12, htmlcap = "Fig. 9: Genere by rating and seasonal charts showing genre and rating by week of year.<br>Top 20 most frequent genres examined (top). Seasonal genre chart limited to top four to assist legibility (middle)."}
 
+# cross genre and rating to see if certain genres have 
+# any unusual rating characteristics
 genre_rating_dat <- merge(genres_dat, rating_dat, by = 'title')
 p39 <- ggplot(aes(x = genre, fill = mpaa_rating),
               data = genre_rating_dat[genre %in% top_genres, ]) +
@@ -665,6 +695,7 @@ p39 <- ggplot(aes(x = genre, fill = mpaa_rating),
         legend.position = 'right') +
   scale_fill_brewer(type = 'qual', palette = 'Set2')
 
+# check week of release by top for genres to see seasonality in film calendar
 week_dat <- unique_films(movie_df, 'week')
 genre_week_dat <- merge(genres_dat, week_dat, by = 'title')
 p40 <- ggplot(aes(x = week, fill = genre),
@@ -675,6 +706,7 @@ p40 <- ggplot(aes(x = week, fill = genre),
   scale_fill_brewer(type = 'qual', palette = 'Accent') + 
   scale_x_discrete(breaks = seq(week_range[1]-1,week_range[2], 10))
 
+# check for seasonality in ratings
 rating_week_dat <- merge(rating_dat, week_dat, by = 'title')
 p41 <- ggplot(aes(x = week, fill = mpaa_rating),
               data = rating_week_dat) +
@@ -687,6 +719,7 @@ p41 <- ggplot(aes(x = week, fill = mpaa_rating),
 grid.arrange(p39, p40, p41, nrow = 3,
              top = 'Genre and Rating: Category and Calendar')
 
+# clean memory
 rm(p39, p40, p41)
 
 ```
@@ -699,12 +732,15 @@ Notes:
 * Ratings are seasonal, but less so: PG and G-rated films are out in low, constant levels; PG-13 is usually common (especially during late Summer), but has some share stolen by R-rated films going into Halloween
 * We only have limited data, so the seasonal inferences, while interesting, are likely not that statistically significant (n(years) = 12)
 
-## Numeric Measures: Film-Week Variables
+## Numeric Variables
+
+### Film-Week Variables
 
 We have a large number of additional variables remaining.  These are all numeric and can be divided into two categories: those that vary by film (e.g., they are unique on a per film basis) and those that vary by film-week (the remaining competative measures).  The following table shows pairwise plots of those variables that change for a film on a weekly basis. I use ggpairs from the [GGAlly](https://cran.r-project.org/web/packages/GGally/index.html) package. Variables that needed a log transform in the univariate section are provided in a log transformed version below, too. The competative variables below are the year-week cumulative values less our film specific measure (so the value of all other films in a given film-week).  We already know the relative week of release is important, so I throw it in for good measure.
 
 ```{r echo = FALSE, echo = FALSE, Weekly_Pairwise, fig.width = 12, fig.height = 12, htmlcap = "Fig. 10: Pairwise plots of weekly varying numeric variables from univariate analysis section<br>with appropriate log10 transformed variables (key metrics)."}
 
+# build dataframe of variables that change by film week
 weekfilm_dat <- copy(unique(movie_df[weekly_gross > 0 
                                     & weekly_theaters > 0
                                     & daily_theater_eff > 0, 
@@ -720,6 +756,8 @@ weekfilm_dat <- copy(unique(movie_df[weekly_gross > 0
 weekfilm_dat[, log10_weekly_gross := log10(weekly_gross)]
 weekfilm_dat[, log10_weekly_theaters := log10(weekly_theaters)]
 weekfilm_dat[, log10_daily_theater_eff := log10(daily_theater_eff)]
+weekfilm_dat[, log10_relative_week := log10(relative_week)]
+
 
 p42 <- ggpairs(na.omit(weekfilm_dat),
                lower = list(continuous = 'density'),
@@ -750,7 +788,7 @@ Notworthy points:
 * Competition in critics and theaters are both negativey correlated with competative weekly gross - this would make sense if there are fewer, larger films out when box office is greatest (which we observed in the univariate and seasonality sections)
 
 
-## Numeric Measures: Unique Film Variables
+### Unique Film Variables
 
 For the following plots, I include those variables that are unique by film. I apologize in advance for the small font size needed to make the chart legible. Variables that I examined in log transform are provided in a log transformed version below, too.
 
@@ -796,7 +834,7 @@ p43 <- ggpairs(na.omit(unifilm_dat),
                title = 'Unique Film Pairwise Plots')
 
 # fix ggpairs diag to display variable names
-p43 <- make_diag_name(p43,unifilm_dat)
+p43 <- make_diag_name(p43, unifilm_dat)
 
 # change size of text in correlation boxes
 p43 <- change_cor_size(p43, 4)
@@ -822,7 +860,7 @@ Some interesting observations:
 
 # Multivariate Exploration
 
-## Picking Winners
+## Release Lifecycle: Understanding the Business
 
 In terms of business importance, understanding what differentiates the best films (acording to our key metrics) from the rest is of huge interest.  Given the influence of novelty (the relative week of release), it also makes sense to continue examining our key metrics along those lines.  The following analysis makes use of multivariate analysis to try to tease out the differences in lifecycle among films. I try to see what differences are observable in film lifecycle if we had 'perfect foresight' into how big a domestic box office success a film became. 
 
@@ -843,27 +881,33 @@ gross_tier <- make_tier(movie_df, 'gross', qtiles)
 #add gross tier to main data set
 movie_df <- merge(movie_df, gross_tier, by = 'title')
 
+# improve tier names for readablity
+gross_levs <- levels(movie_df[,gross_tier])
+new_gross_levs <- unlist(lapply(gross_levs, conv_tier, mils = T))
+movie_df[, gross_tier := factor(gross_tier, labels = new_gross_levs)]
+
 #build gross_tier vs realtive week plots
 #weekly gross
-p44 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'gross_tier')
+p44 <- make_tier_week_plot(movie_df, 'weekly_gross', 'gross_tier', T, T)
 #weekly theaters
-p45 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'gross_tier')
+p45 <- make_tier_week_plot(movie_df, 'weekly_theaters', 'gross_tier', T, F)
 #daily theater eff
-p46 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'gross_tier')
+p46 <- make_tier_week_plot(movie_df, 'daily_theater_eff', 'gross_tier', T, T)
 
 # grab joint legend
 joint_legend <- grab_legend(p44)
 
 # remove individual legends 
-p44 <- p44 + theme(legend.position="none")
-p45 <- p45 + theme(legend.position="none")
-p46 <- p46 + theme(legend.position="none")
+p44 <- p44 + theme(legend.position = "none")
+p45 <- p45 + theme(legend.position = "none")
+p46 <- p46 + theme(legend.position = "none")
 
-
+# plots single legend on arranged grid
 grid.arrange(arrangeGrob(p44, p45, p46, nrow = 1),
              joint_legend, nrow = 2, heights = c(10, 1),
-             top = 'Key Metrics and Perfect Foresigt: Release Lifecycle')
+             top = 'Release Lifecycle: Key Metrics and Perfect Foresigt')
 
+# clean memory
 rm(p44, p45, p46)
 
 
@@ -889,32 +933,38 @@ Opening strength can definitely be used on a semi-predictive basis, at least for
 #build opening week factor
 open_tier <- make_tier(movie_df, 'weekly_gross', qtiles)
 # fix name for intelgibility
-setnames(open_tier,'weekly_gross_tier','open_tier')
+setnames(open_tier, 'weekly_gross_tier', 'open_tier')
 
 #add opening tier to main data set
 movie_df <- merge(movie_df, open_tier, by = 'title')
 
+# fix tier names for readability
+open_levs <- levels(movie_df[,open_tier])
+new_open_levs <- unlist(lapply(open_levs, conv_tier, mils = T))
+movie_df[, open_tier := factor(open_tier, labels = new_open_levs)]
+
 #build open_tier vs realtive week plots
 #weekly gross
-p47 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'open_tier')
+p47 <- make_tier_week_plot(movie_df, 'weekly_gross', 'open_tier', T, T)
 #weekly theaters
-p48 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'open_tier')
+p48 <- make_tier_week_plot(movie_df, 'weekly_theaters', 'open_tier', T, F)
 #daily theater eff
-p49 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'open_tier')
+p49 <- make_tier_week_plot(movie_df, 'daily_theater_eff', 'open_tier', T, T)
 
 # grab joint legend
 joint_legend <- grab_legend(p47)
 
 # remove individual legends 
-p47 <- p47 + theme(legend.position="none")
-p48 <- p48 + theme(legend.position="none")
-p49 <- p49 + theme(legend.position="none")
+p47 <- p47 + theme(legend.position = "none")
+p48 <- p48 + theme(legend.position = "none")
+p49 <- p49 + theme(legend.position = "none")
 
-
+# plots single legend on arranged grid
 grid.arrange(arrangeGrob(p47, p48, p49, nrow = 1),
              joint_legend, nrow = 2, heights = c(10, 1),
-             top = 'Opening Week: Release Lifecycle')
+             top = 'Release Lifecycle: Opening Week')
 
+# clean memory
 rm(p47, p48, p49)
 
 
@@ -938,32 +988,38 @@ I'll next tier films by critic average ratings. We're using critic scores as a p
 #build criticing week factor
 critic_tier <- make_tier(movie_df, 'critics_avg', qtiles)
 # fix name for intelgibility
-setnames(critic_tier,'critics_avg_tier','critic_tier')
+setnames(critic_tier,'critics_avg_tier', 'critic_tier')
 
 #add criticing tier to main data set
 movie_df <- merge(movie_df, critic_tier, by = 'title')
 
+# fix tier names for readability
+crit_levs <- levels(movie_df[,critic_tier])
+new_crit_levs <- unlist(lapply(crit_levs, conv_tier, mils = F))
+movie_df[, critic_tier := factor(critic_tier, labels = new_crit_levs)]
+
 #build critic_tier vs realtive week plots
 #weekly gross
-p50 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'critic_tier')
+p50 <- make_tier_week_plot(movie_df, 'weekly_gross', 'critic_tier', T, T)
 #weekly theaters
-p51 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'critic_tier')
+p51 <- make_tier_week_plot(movie_df, 'weekly_theaters', 'critic_tier', T, F)
 #daily theater eff
-p52 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'critic_tier')
+p52 <- make_tier_week_plot(movie_df, 'daily_theater_eff', 'critic_tier', T, T)
 
 # grab joint legend
 joint_legend <- grab_legend(p50)
 
 # remove individual legends 
-p50 <- p50 + theme(legend.position="none")
-p51 <- p51 + theme(legend.position="none")
-p52 <- p52 + theme(legend.position="none")
+p50 <- p50 + theme(legend.position = "none")
+p51 <- p51 + theme(legend.position = "none")
+p52 <- p52 + theme(legend.position = "none")
 
-
+# plots single legend on arranged grid
 grid.arrange(arrangeGrob(p50, p51, p52, nrow = 1),
              joint_legend, nrow = 2, heights = c(10, 1),
-             top = 'Critical Acclaim: Release Lifecycle')
+             top = 'Release Lifecycle: Critical Acclaim ')
 
+# clean memory
 rm(p50, p51, p52)
 
 ```
@@ -976,18 +1032,24 @@ Critical acclaim notes:
 
 Briefly, I want to see whether critical darlings (high critical appraisal) and sleeper hits (small openings) are the same films.  We've seen some evidence from their lifecycle that makes me think they're related.
 
-```{r echo=FALSE, Critical_Sleepers, fig.width = 12, fig.height = 3, htmlcap = "Fig. 15: Cross-section of critic tiers by opening tier."}
+```{r echo=FALSE, Critical_Sleepers, fig.width = 12, fig.height = 6, htmlcap = "Fig. 15: Cross-section of critic tiers by opening tier."}
 
-ggplot(aes(x = critic_tier, fill = open_tier),
+# plot to determine if critical darlings and sleeper hits are the same films
+p53 <- ggplot(aes(x = critic_tier, fill = open_tier),
        data = unique(movie_df[!is.na(critic_tier) & !is.na(open_tier), ])) +
-  geom_bar(position = 'fill') +
-  ggtitle('Are Sleeper Hits Critical Darlings?')
+  geom_bar(position = 'dodge') +
+  ggtitle('Are Sleeper Hits Critical Darlings?') +
+  scale_fill_brewer(type = 'seq', palette = 'Spectral')
+
+p53
+
+rm(p53)
 
 ```
 
-Plotting using the uniform stacked bar allows me to check the relative incidence of opening tier among different critical tiers. Using a bivariate box plot of critic tier and opening, I would have missed the fact that the top rated films are driven by extremes at both ends.  Certainly, top rated films contain more sleeper hits, but critics also seem to disproportionately love huge releases, too. So the answer is: critical darlings and sleeper hits are kinda, but not really, the same.
+Plotting using the bar chart allows me to check the relative incidence of opening tier among different critical tiers. Using a bivariate box plot of critic tier and opening, I would have missed the fact that the top rated films are driven by extremes at both ends.  Certainly, top rated films contain more sleeper hits, but critics also seem to disproportionately love huge releases, too. So the answer is: critical darlings and sleeper hits are kinda, but not really, the same.
 
-We also considered cast / talent to be a proxy for quality.  I consider that next.
+We also considered cast / talent to be a proxy for quality.  Cast is up next.
 
 ### Casting Call
 
@@ -998,140 +1060,331 @@ Here I tier films by the cumulatitve pictures the cast has been in (we dropped t
 #build casting tier factor
 cast_tier <- make_tier(movie_df, 'talent_cum_pics', qtiles)
 # fix name for intelgibility
-setnames(cast_tier,'talent_cum_pics_tier','cast_tier')
+setnames(cast_tier,'talent_cum_pics_tier', 'cast_tier')
 
 #add casting tier to main data set
 movie_df <- merge(movie_df, cast_tier, by = 'title')
 
+# fix tier names for readability
+cast_levs <- levels(movie_df[,cast_tier])
+new_cast_levs <- unlist(lapply(cast_levs, conv_tier, mils = F))
+movie_df[, cast_tier := factor(cast_tier, labels = new_cast_levs)]
+
 #build cast_tier vs realtive week plots
 #weekly gross
-p53 <- build_tiered_week_plot(movie_df, 'weekly_gross', 'cast_tier')
+p54 <- make_tier_week_plot(movie_df, 'weekly_gross', 'cast_tier', T, T)
 #weekly theaters
-p54 <- build_tiered_week_plot(movie_df, 'weekly_theaters', 'cast_tier')
+p55 <- make_tier_week_plot(movie_df, 'weekly_theaters', 'cast_tier', T, F)
 #daily theater eff
-p55 <- build_tiered_week_plot(movie_df, 'daily_theater_eff', 'cast_tier')
+p56 <- make_tier_week_plot(movie_df, 'daily_theater_eff', 'cast_tier', T, T)
 
 # grab joint legend
-joint_legend <- grab_legend(p53)
+joint_legend <- grab_legend(p54)
 
 # remove individual legends 
-p53 <- p53 + theme(legend.position="none")
-p54 <- p54 + theme(legend.position="none")
-p55 <- p55 + theme(legend.position="none")
+p54 <- p54 + theme(legend.position = "none")
+p55 <- p55 + theme(legend.position = "none")
+p56 <- p56 + theme(legend.position = "none")
 
-
-grid.arrange(arrangeGrob(p53, p54, p55, nrow = 1),
+# plots single legend on arranged grid
+grid.arrange(arrangeGrob(p54, p55, p56, nrow = 1),
              joint_legend, nrow = 2, heights = c(10, 1),
-             top = 'Casting Call: Release Lifecycle')
+             top = 'Release Lifecycle: Casting')
 
-rm(p53, p54, p55)
+# clean from memory
+rm(p54, p55, p56)
 
 ```
 
 Comments on casting and performance:
 
-* Cast derived measures have the most monotonic relationship with our perfect foresight measures
-* causality is hard to tease out, but given the fact that we can tell a simple compelling story and already know our talent measure has lookahead bias, I'd be surprised if we did not see a stable, monotonic relationship
+* Cast derived measures have the most monotonic relationship with our perfect foresight measures (certainly for the top 5% in cast)
+* Causality is hard to tease out, but given the fact that we can tell a simple compelling (though untested) story and already know our talent measure has lookahead bias, I'd be surprised if we did not see a fairly stable, monotonic relationship
 
-You may be wondering how different our cast and critic quality metrics are from one another.  It is easy to imagine that there is one common factor driving cast, critic score and gross (some single 'awesomeness' factor). Here is a simple chart that provides an answer.
+You may be wondering how different our cast and critic quality metrics are from one another.  It is easy to imagine that there is one common factor driving cast, critic score and gross (some single 'awesomeness' factor). Here is a simple chart that provides a partial answer.
 
-```{r echo=FALSE, Multidimensional_Proof, fig.width = 12, fig.height = 3, htmlcap = "Fig. 16: The cross-sections of cast tiers, critic score tiers and log10 total gross."}
+```{r echo=FALSE, Multidimensional_Proof, fig.width = 12, fig.height = 6, htmlcap = "Fig. 16: The cross-sections of cast tiers, critic score tiers and log10 total gross."}
 
-ggplot(aes(x = cast_tier, y = gross, color = critic_tier), 
+# plots boxplot of cast, critic and gross to see if they are different
+# from one another
+p57 <- ggplot(aes(x = cast_tier, y = gross, fill = critic_tier), 
        data = na.omit(unique(movie_df[relative_week == 1,
-                                      list(critic_tier, cast_tier, gross)]))) + 
+                                      list(critic_tier,
+                                           cast_tier,
+                                           gross)]))) + 
   geom_boxplot(position = 'dodge') +
   scale_y_log10() +
-  ggtitle('Looking for "Awesomeness"') +
-  ylab('log10(gross)')
-  
+  ggtitle('Single Source "Awesomeness"') +
+  ylab('log10(gross)') +
+  scale_fill_brewer(type = 'seq', palette = 'Spectral')
+
+p57
+
+rm(p57)
 ```
 
-Looking at the above, I notice that the relationship with gross is essentially monotonic across casting tier and across critic tier.  If cast tier and critic tier captured the same exact information about gross, we would not observe monotonicity with gross along both dimensions. Clearly, the measures examined here are different (though this does not preclude a better representation using some latent factor...work for another time).
+Looking at the above, I notice that the relationship with gross is fairly (though not perfectly) monotonic across casting tier and across critic tier.  If cast tier and critic tier captured the same exact information about gross, we would not observe monotonicity with gross along both dimensions. Clearly, the measures examined here are different (though this does not preclude a better representation using some latent factor...work for another time).
 
-### Seasonality and Other Films
+### Seasonality and Competition
 
-```{r echo=FALSE, Multidimensional_Proof, fig.width = 12, fig.height = 3, htmlcap = "Fig. 17: The cross-sections of cast tiers, critic score tiers and total gross."}
+Again, everything I mentioned above needs to be viewed in light of what we learned about seasonality and the prevalence of other film competition.  To illustrate, I prepare plots that seperate the calendar by release schedule according to film/school season (weeks were too many to read) and level of competition.  As I'm curious about lifecycle, I look at a cut from the release week and week four of release.  
+
+```{r echo=FALSE, Season_Comp, fig.width = 12, fig.height = 6, htmlcap = "Fig. 17: Seasons and competition (theaters), relative weeks one (left) and four (right).<br>Seasons follow the film/school calendar: Summer (mid-May to mid Aug), Fall (mid-Aug to mid-Nov), Winter (mid-Nov to mid-Feb) and Spring (mid-Feb to mid-May)"}
 
 # build seasonal factors for release dates
 movie_df[between(release_date,
-                 as.Date(paste(year,5,16,sep = '-')),
-                 as.Date(paste(year,8,15,sep = '-'))),
+                 as.Date(paste(year, 5, 16, sep = '-')),
+                 as.Date(paste(year, 8, 15, sep = '-'))),
          season := 'Summer']
 
 movie_df[between(release_date,
-                 as.Date(paste(year,8,16,sep = '-')),
-                 as.Date(paste(year,11,15,sep = '-'))),
+                 as.Date(paste(year, 8, 16, sep = '-')),
+                 as.Date(paste(year, 11, 15, sep = '-'))),
          season := 'Fall']
 
 movie_df[between(release_date,
-                 as.Date(paste(year,2,16,sep = '-')),
-                 as.Date(paste(year,5,15,sep = '-'))),
+                 as.Date(paste(year, 2, 16, sep = '-')),
+                 as.Date(paste(year, 5, 15, sep = '-'))),
          season := 'Spring']
 
 movie_df[between(release_date,
-                 as.Date(paste(year,11,16,sep = '-')),
-                 as.Date(paste(year,12,31,sep = '-'))) |
+                 as.Date(paste(year, 11, 16, sep = '-')),
+                 as.Date(paste(year, 12, 31, sep = '-'))) |
          between(release_date,
-                 as.Date(paste(year,1,1,sep = '-')),
-                 as.Date(paste(year,2,15,sep = '-'))),
+                 as.Date(paste(year, 1, 1, sep = '-')),
+                 as.Date(paste(year, 2, 15, sep = '-'))),
          season := 'Winter']
 
 #build competition tier factor
 comp_tier <- make_tier(movie_df, 'comp_week_theaters', qtiles)
+
 # fix name for intelgibility
-setnames(comp_tier,'comp_week_theaters_tier','comp_tier')
+setnames(comp_tier, 'comp_week_theaters_tier', 'comp_tier')
+
 #add competition tier to main data set
 movie_df <- merge(movie_df, comp_tier, by = 'title')
 
-movie_df[,cum_comp_theaters:= mean(comp_week_critics, na.rm = T), by = title]
+# fix tier names for readability
+comp_levs <- levels(movie_df[,comp_tier])
+new_comp_levs <- unlist(lapply(comp_levs, conv_tier, mils = F))
+movie_df[, comp_tier := factor(comp_tier, labels = new_comp_levs)]
 
-ggplot(aes(x = season, y = weekly_gross, color = comp_tier), 
-       data = na.omit(
-         unique(movie_df[relative_week == 1,list(season, comp_tier, weekly_gross)]))
-       ) + 
+
+# make relative week 1 plot 
+p58 <- ggplot(aes(x = season, y = weekly_gross, fill = comp_tier), 
+              data = na.omit(movie_df[relative_week == 1,
+                                      list(season,
+                                           comp_tier,
+                                           weekly_gross)])) +
   geom_boxplot(position = 'dodge') +
-  #coord_cartesian(ylim = gross_range) +
-  scale_y_log10()
+  scale_y_log10() +
+  theme(legend.position = "bottom") +
+  scale_fill_brewer(type = 'seq', palette = 'Spectral')
 
+# make relative week 4 plot
+p59 <- ggplot(aes(x = season, y = weekly_gross, fill = comp_tier), 
+              data = na.omit(movie_df[relative_week == 4,
+                                      list(season,
+                                           comp_tier,
+                                           weekly_gross)])) +
+  geom_boxplot(position = 'dodge') +
+  scale_y_log10() +
+  theme(legend.position = "bottom") +
+  scale_fill_brewer(type = 'seq', palette = 'Spectral')
+
+# grab joint legend
+joint_legend <- grab_legend(p58)
+
+# remove individual legends 
+p58 <- p58 + theme(legend.position = "none")
+p59 <- p59 + theme(legend.position = "none")
+
+grid.arrange(arrangeGrob(p58, p59, nrow = 1),
+             joint_legend, nrow = 2, heights = c(10, 1),
+             top = 'Release Lifecycle: Seasonality and Competition')
+
+rm(p58, p59)
 
 ```
 
+Quick thoughts on seasonality and competition:
 
-# Multivariate Exploration
+* We've seen that seasonality matters and we see it here again; the Spring and Fall see lower weekly grosses than the Summer (definitely) and Winter (slightly)
+* Competition for theaters (chosen because it had the strongest bivariate relationship) is a little strange: close to monotonic in all seasons by the fourth week of release, but during the first week of release in Winter it behaves a little perversely (more competition should be bad and Winter matters as it is prime movie season) 
 
-### Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+## Modeling with Selected Variables
 
-### Were there any interesting or surprising interactions between features?
+What follows is some cursory modeling of daily theater efficiency. I chose this variable as it probably has the most meaning from a business perspective as it could address resource allocation.
 
-### OPTIONAL: Did you create any models with your dataset? Discuss the strengths and limitations of your model.
+I these models build upon one another and look solely at the items examained.  
+
+1. I first model log10 daily theater efficiency against log10 relative week.
+2. Next, I add my descriptive variables season (rather than week of year), genre (limited to top twenty by film count), MPAA Rating and runtime
+3. Quality variables including counts of critics, critic averages, audience averages, critic opinion dispersion (IQR) and cumulative cast films (we dropped the other talent measures)
+4. The final model adds competition in weekly gross, weekly critic opinions and weekly theaters 
+
+```{r echo = FALSE}
+# novelty
+m1 <- lm(log10(daily_theater_eff) ~ log10(relative_week), 
+         data = movie_df[genre %in% top_genres
+                         & relative_week < 11])
+
+# descriptive measures
+m2 <- update(m1, ~ . + season 
+             + genre
+             + mpaa_rating
+             + runtime)
+
+# quality measures
+m3 <- update(m2, ~ . + count_critics 
+             + critics_avg
+             + audience_avg
+             + critics_IQR
+             + talent_cum_pics)
+
+# competative measures
+m4 <- update(m3, ~ . + comp_week_gross 
+             + comp_week_critics
+             + comp_week_theaters)
+
+#show model comparison
+mtable(m1, m2, m3, m4)
+
+```
+
+Thoughts on a linear approximation:
+
+* It is fairly obvious that the novelty of a movie is a huge driver of efficiency. That first model explains 38.5% of the variance.  
+* Adding our descriptive features boosts that to 50.1% of the variance explained.  The seasons are all important (Fall is the worst and the baseline). Many genres are important, too (though they look bad stacked against animation). Ratings, with the exception of R (which is worse than G), don't have much meaning. Runtime is important - i have no good theory as to why
+* Quality is meaningful and boosts our model to 58.9% of variance explained.  With the exception of audience averages (which flipped sign from their bivariate correlation in the presence of other measures), all of these work as you'd expect.  Interestingly, the introduction of quality measures flips the coefficient of R ratings
+* Competative variables add an additional 2.5% to explanatory power, bringing the model to 60.4% R^2.  Competition in theaters is a net negative, but competition in gross (maybe due to season?) is positive as it was in our bivariate analysis.  Competition in quality (critic scores) doesn't seem to matter, at least the way that variable was constructed
+
+The biggest shortcoming of the model is that the data is really non-linear.  One could do a much better job with more complex transforms or a non-linear modeling approach like trees. We could also get more and better data (I have a bunch of other factors we didn't use). Additionally, I contratined the data to cases we examined previously, which threw away numerous observations. We didn't scale or center our variables, which makes the relative importance hard to assess.  Finally, checking the residuals (plot not shown) shows that there are some problems with fit in the tails and several outliers that have leverage - addressing these items would improve my faith in the significance of the results.  
 
 ------
 
-# Final Plots and Summary
+# Final Plots and Takeaway
 
-### Plot One
-```{r echo=FALSE, Plot_One}
+At the outset, I decided to approach this analysis from a business perspective as a theater owner. So, my summary points are all my perspective on how to approach the problem of maximizing theater profitability (so, our efficiency measure).
 
-ggplot(aes(x = critic_tier, y = talent_cum_pics, color = gross_tier), data = unique(movie_df[!is.na(critic_tier) & !is.na(open_tier), list(talent_cum_pics,open_tier,critic_tier,gross_tier)])) +
-  geom_boxplot(position = 'dodge')
+## A Story of Path Dependency
 
+One of the key findings surrounds the immense path dependency of large commercial successes.  Seriously, the median film in the top 5% domestic gross tier takes three weeks before its efficiency falls to the level of a just good film (66% - 95% domestic gross tier). 
 
+```{r echo=FALSE, Plot_One,  fig.width = 12, fig.height = 6, htmlcap = "Fig. 18: We see, again, the enormous path dependency in film lifecycle using our perfect foresight tiers.<br>Log 10 Daily Theater Efficiency by log 10 Relative Release Week.<br>Solid lines represent medians, dashed lines at .25 and .75 quantiles."}
+
+# improved version of the perfect foresight plot that shows path
+# dependency by gross tier
+p60 <- ggplot(aes(y = daily_theater_eff, 
+                  x = relative_week, 
+                  color = gross_tier), 
+              data = na.omit(movie_df[,list(daily_theater_eff,
+                                            relative_week,
+                                            gross_tier)])) +
+  geom_point(alpha = .15, position = position_jitter(w = .15)) +
+  scale_x_log10(breaks = seq(1, 10, 1)) +
+  coord_cartesian(xlim = c(.9, 10.5),
+                  ylim = eff_range) +
+  scale_y_log10(labels = dollar, breaks = seq(500, 10000, 1000)) +
+  labs(y = expression(paste(log[10], ' Daily Theater Efficiency', sep = '')),
+       x = expression(paste(log[10], ' Relative Release Week', sep = '')),
+       color = 'Gross Tier') +
+  geom_line(stat = 'summary',
+              fun.y = 'median',
+              size = 1) +
+  geom_line(stat = 'summary',
+            fun.y = quantile, prob = .25,
+            linetype = 2,
+            size = .5) +
+  geom_line(stat = 'summary',
+            fun.y = quantile, prob = .75,
+            linetype = 2,
+            size = .5) +
+  scale_color_brewer(type = 'seq', palette = 'Spectral') +
+  ggtitle('A Little Clairvoyance Would Go a Long Way')
+
+p60
+
+rm(p60)
+              
 ```
 
-### Description One
+Three weeks is a long time in the movie business (we've seen how important the relative week of release factor is), so these to 5% films are really impressive.  What's more is they do better than all other films as they age - the middle 50% distribution for these top films never intersects with another tier through ten weeks.  
 
+What this means is that a theater owner should favor one of these extreme efficiency performers (a good marker for a top 5% gross tier film) early and at every point along the way when considering swapping out older films.  He/she may rationally these films over new releases.
 
-### Plot Two
-```{r echo=FALSE, Plot_Two}
+I've puzzled over the fact that the film tiers don't really converge in efficiency.  I've offered a couple stories: seasonality or rarity could introduce a temporal barrier to executing these swaps between films, but I think general overcapacity is a more likely story. I can't prove it as I don't have seat / theater utilization data, but overcapacity would manifest as non-convergence if all tiers of films often played to theaters with spare seats. General overcapacity would be a pretty rational response in an industry where demand peaks and troughs (weekends, seasonally and with hits). 
 
+I take additional evidence from the fact that theater owners otherwise seem to respond to supply/demand imbalances when scarcity appears to be at work.   
+
+## Efficency Through Scarcity
+
+This is simple supply and demand. Evidence of demand driven responses was seen when we looked at films that opened in a few locations or were critical darlings. These films started at the extremes in efficiency, peaked in revenues and theaters slowly and took longer than normal for their gross to tail off. However, it took about a month for this process to occur, which is more than enough time for a savvy theater owner to get the film onto a screen and front run his/her peers.
+
+```{r echo=FALSE, Plot_Two, fig.width = 12, fig.height = 6, htmlcap = "Fig. 19: From top left to bottom right we get the flip-book version of the first four weeks of a film's release.<br>Efficiency is measured against Critical Opinion Tier and Opening Tier."}
+
+# find new efficiency range for plots
+new_eff_range <- get_chart_range(movie_df, 'daily_theater_eff', .01, .999)
+
+p61 <- ggplot(aes(fill = open_tier,
+                  x = critic_tier,
+                  y = daily_theater_eff),
+              data = na.omit(movie_df[relative_week %in% 1:4,
+                            list(critic_tier,
+                                 daily_theater_eff,
+                                 open_tier,
+                                 r_week = paste('Week ',
+                                                relative_week,
+                                                ' Post Release',
+                                                sep = ''))])) +
+  geom_boxplot() + 
+  scale_y_log10(labels = dollar, breaks = seq(1000,25000,5000)) +
+  facet_wrap(~ r_week) +
+  scale_fill_brewer(type = 'seq', palette = 'Spectral') +
+  ggtitle('Ensuring Theater Efficiency: Biggest and/or Best') + 
+  labs(y = expression(paste(log[10], ' Daily Theater Efficiency', sep = '')),
+       x = 'Critical Opinion Tier',
+       fill = 'Opening Tier',
+       strip = 'Week') +
+  theme(legend.position = "bottom") +
+  coord_cartesian(ylim = new_eff_range)
+  
 ```
 
-### Description Two
+The idea here is that we have two different, essentially realtime proxies for demand: opening size and critical approval.  We see that the biggest opening films stay the most efficient for a long time (really lots of demand without respect to critic opinion).  However, we see something more interesting: smallish opening films that have high critic approval are also very efficient (due to an issue with the relative supply of theaters). We saw this in the multivariate section, too. Over several weeks efficiency converges only moderately as theaters were brought online.  
 
+So, rational responses to supply and demand occur, just slowly. Given that, one viable strategy for a theater owner would be to focus on both the big releases and recent critically-praised indie films (without taking the first week release risk).  However, the fact that I've never seen a theater like this makes me wonder why it doesn't happen (issues with different audiences? contracting? or has it never been tried?).     
+
+As I mentioned before, there is a sample bias caused by the fact that the dat  includes only films that were in over 1000 theaters at some point and these high efficiency films might be the marginal small release films that made it big.  However, The low-middle opening tier shows a similar high efficiency pattern among critical darlings and is a much bigger cohort, so this result is probably robust.
+
+Finally, when considering theater efficiency, we saw that seasonality and timing play a role.
 
 ### Plot Three
 ```{r echo=FALSE, Plot_Three}
+
+p62 <- ggplot(aes(fill = genre,
+                  x = season,
+                  y = daily_theater_eff),
+              data = na.omit(movie_df[relative_week %in% 1:4,
+                            list(comp_tier,
+                                 daily_theater_eff,
+                                 season,
+                                 r_week = paste('Week ',
+                                                relative_week,
+                                                ' Post Release',
+                                                sep = ''))])) +
+  geom_boxplot() + 
+  scale_y_log10(labels = dollar, breaks = seq(500,10000,1000)) +
+  facet_wrap(~ r_week) +
+  scale_fill_brewer(type = 'seq', palette = 'Spectral') +
+  ggtitle("Timing's Not Everything, But It Is Still a Thing") + 
+  labs(y = expression(paste(log[10], ' Daily Theater Efficiency', sep = '')),
+       x = 'Season',
+       fill = 'Competitor Theaters',
+       strip = 'Week') +
+  theme(legend.position = "bottom") +
+  coord_cartesian(ylim = eff_range)
+
 
 ```
 
