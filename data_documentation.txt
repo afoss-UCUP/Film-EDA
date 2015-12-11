@@ -1,0 +1,49 @@
+Data Dictionary
+
+Sources:
+Box Office Mojo: www.boxofficemojo.com
+Metacritic: www.metacritic.com
+
+
+title: film title from Box Office Mojo
+
+distributor: film distributor from Box Office Mojo
+
+release_data: film release date according to Box Office Mojo
+
+genre: film genre according to Box Office Mojo
+
+runtime: film duration in minutes according to Box Office Mojo
+
+mpaa_rating: film rating according to Box Office Mojo
+
+production_budget: cost of film production according to Box Office Mojo
+
+box_office: keyed with box office values for 
+	domestic: numbers from Box Office Mojo
+	total: numbers from Box Office Mojo
+	foreign: numbers from Box Office Mojo
+
+talent: keys with values for 
+	director: name from Box Office Mojo
+	actors: lists composing a table of
+		name: actor name from Box Office Mojo
+		degree: actor's degrees (edges to other nodes) calculated using igraph package over entire dataset
+		closeness: actor's closeness (distance from graph center) using igraph package over entire dataset
+		betweenness: actor's betweeness (measure of paths spanning an actor's node) using igraph package over entire dataset
+		eccentricity: actor's eccentricity (actor's node to furthest point on graph) using igraph package over entire dataset
+		pic_count: number of films an actor appeared in the dataset
+
+weekly: keys with lists comprising a table of 
+	rel_week: relative week of release
+	week: week of year from Box Office Mojo
+	theaters: number of theaters for that week from Box Office Mojo
+	days: days between the observations on Box Office Mojo
+	gross: gross for that period according to Box Office Mojo
+
+rating: keys with values for
+	critic_avg: film's critic average on Metacritic
+	audience_avg: film's audience average on Metacritic
+	critic_scores: individual Metacritic scores for a film
+
+weekend: see weekly (difference is the measurement period - weekly includes weekend)
