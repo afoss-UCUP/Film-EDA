@@ -1,8 +1,10 @@
-####
-# These are a variaty of funcitons to scrape movie data from Box Office Mojo
-# and Metacritic.  They are not heavily documented as they are highly site
-# specific.
-####
+########################################################################
+# For Use with data_assembly_script.R
+#
+# These are a variaty of funcitons to support scraping movie data 
+# from Box Office Mojo and Metacritic.  They are not heavily documented
+# as they are highly site specific.
+########################################################################
 
 # grabs BoxOffice Mojo Movie Table of Contents
 grab_mojo_toc <- function(){
@@ -413,7 +415,6 @@ write_list <- function(i, lists, filename){
   }
 }
 
-
 # function that adds meta critic data on critic scores and audience scores
 # to a movie's json row document
 add_metacritic_to_json_row <- function(json_row){
@@ -519,7 +520,6 @@ actor_frame <- function(json_line){
   data.table('title' = film$title, actors)
   
 }
-
 
 #function that attaches various measures from the actor graph to the json line
 attach_actor_data <- function(json_line, actor_dat){
