@@ -7,6 +7,28 @@ knit_hooks$set(htmlcap = function(before, options, envir) {
   }
 })
 
+#univariate plotter
+uni_plot <- function(df, col, rang, logx){
+  
+  dat <- na.omit(df[, list(V1 = get(col))])
+  if(logx){
+    bw <- (log10(rang[2])-log10(rang[1])) / 40
+  } else {
+    bw <- (rang[2]-rang[1])/40
+  }
+  plt <- ggplot(aes(x = V1), data = dat) +
+    geom_bar(binwidth = bw, fill = 'navyblue') +
+    coord_cartesian(xlim = rang) +
+    xlab(col)
+  
+  if(logx){
+    plt <- plt + scale_x_log10()
+    plt <- plt + xlab(paste('log10(', col, ')', sep = ''))
+  }
+  
+  return(plt)
+}
+  
 # takes a data.table and column 
 # then quantile range to set x/y limits when plotting
 get_chart_range <- function(df,col,bg,en){
@@ -18,7 +40,8 @@ numlist <- function(x){
   as.numeric(unlist(x))
 }
 
-#builds a dataframe of selected film attrubutes from a json document
+# builds a dataframe of selected film attrubutes from a json document
+# highly specific to the json data structure I used
 make_film_frame <- function(json_line){
   
   film <- fromJSON(json_line, method = 'C')
@@ -28,7 +51,6 @@ make_film_frame <- function(json_line){
     return(NULL)
   } else {
     film$box_office <- NULL
-    
     
     film$max_theaters <- max(numlist(film$weekly$theaters), na.rm = T)
     film$cum_theaters <- sum(numlist(film$weekly$theaters), na.rm = T)
@@ -178,7 +200,7 @@ make_tier <- function(df, col, quan){
 }
     
 #builds multivariate plots vs relative week and some tier
-build_tiered_week_plot <- function(df, col, tier){
+make_tier_week_plot <- function(df, col, tier, logx, logy){
   # find display range
   plot_range <- get_chart_range(df, as.character(col), .01, .999)
   
@@ -190,9 +212,7 @@ build_tiered_week_plot <- function(df, col, tier){
                   y = V1,
                   color = V2),
               data = dat[!is.na(V1) & !is.na(V2), ]) +
-    geom_point(alpha = .1, position = position_jitter(h = 0)) +
-    coord_cartesian(xlim = c(.5, 8.5),
-                    ylim = plot_range) +
+    geom_point(alpha = .125, position = position_jitter(w = .15)) +
     geom_line(stat = 'summary',
               fun.y = 'median',
               size = 1) +
@@ -204,12 +224,25 @@ build_tiered_week_plot <- function(df, col, tier){
               fun.y = quantile, prob = .75,
               linetype = 2,
               size = .5) +
-    scale_y_log10() +
-    ylab(paste('log10(', col, ')', sep = '')) +
     xlab('relative_week') +
     theme(legend.position="bottom") +
-    labs(color = tier)
-         
+    labs(color = tier) +
+    scale_color_brewer(type = 'seq', palette = 'Spectral') +
+    coord_cartesian(xlim = c(.5, 10.5),
+                    ylim = plot_range) +
+    ylab(col)
+  
+  if(logx){
+    plt <- plt + scale_x_log10(breaks = seq(1,10,1))
+    plt <- plt + xlab(paste('log10(relative_week)', sep = ''))
+    plt <- plt + coord_cartesian(xlim = c(1, 10.5),
+                                 ylim = plot_range)
+  }
+  if(logy){
+    plt <- plt + scale_y_log10()
+    plt <- plt + ylab(paste('log10(', col, ')', sep = ''))
+  }
+  
   return(plt)
 }
 
@@ -223,6 +256,20 @@ grab_legend <- function(plt){
   sec <- which(lst %like% 'guide-box')
   legend <- ptab$grobs[[sec]]
   return(legend)
+}
+
+#converts level value to numeric value for legends
+conv_tier <- function(x, mils){
+  x <- unlist(strsplit(x,','))
+  x <- gsub(']', '', x)
+  x <- gsub('\\(', '', x)
+  x <- as.numeric(x)
+  if(mils){
+    x <- paste(x[1]/1000000,'m to ',x[2]/1000000,'m', sep = '')
+  } else {
+    x <- paste(x[1],' to ',x[2], sep = '')
+  }
+  return(x)
 }
 
 
