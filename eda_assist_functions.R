@@ -1,3 +1,12 @@
+#####################################################
+# These are a set of functions designed for use with:
+# film_project.Rmd
+#
+# They are necessary to parse the data and perform
+# the analyses in the markdown document. 
+#####################################################
+
+
 # sets knit hook options to print image captions in html
 knit_hooks$set(htmlcap = function(before, options, envir) {
   if (!before) {

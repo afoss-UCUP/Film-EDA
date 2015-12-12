@@ -1,5 +1,8 @@
+###########################################################
 # This script controls all of the website scraping utilities
 # Please do not run - it takes hours to scrape everything
+############################################################
+
 
 setwd("~/../version-control/Film-EDA")  # set my working directory
 graphics.off() # close charts
