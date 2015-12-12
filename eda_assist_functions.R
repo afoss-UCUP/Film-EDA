@@ -10,7 +10,8 @@
 # sets knit hook options to print image captions in html
 knit_hooks$set(htmlcap = function(before, options, envir) {
   if (!before) {
-    paste('<p class="caption", align = "center"><font size = "2">', options$htmlcap,
+    paste('<p class="caption", align = "center"><font size = "2">',
+          options$htmlcap,
           "</font></p>",
           sep = "")
   }
@@ -74,7 +75,9 @@ make_film_frame <- function(json_line){
     film$relative_week <- numlist(film$weekly$rel_week)
     film$release_date <- as.Date(film$release_date, '%Y-%m-%d')
     film$release_mo_wk <- paste(substr(film$release_date, 6, 7),
-                                ceiling(as.numeric(substr(film$release_date, 9, 10)) / 7),
+                                ceiling(as.numeric(
+                                  substr(film$release_date, 9, 10)
+                                  ) / 7),
                                 sep = '_')
     film$weekend <- NULL
     film$weekly <- NULL
@@ -119,17 +122,23 @@ make_film_frame <- function(json_line){
     }
     
     if ('rating' %in% names(film)){
-      film$count_critics <- try(length(numlist(film$rating$critic_scores)), silent = T)
-      film$critics_avg <- try(mean(numlist(film$rating$critic_scores), na.rm = T), silent = T)
-      film$critics_med <- try(median(numlist(film$rating$critic_scores), na.rm = T), silent = T)
-      if (class(film$critics_avg)[1] == 'try-error' | !is.numeric(film$critics_avg)){
+      film$count_critics <- try(length(numlist(film$rating$critic_scores)),
+                                silent = T)
+      film$critics_avg <- try(mean(numlist(film$rating$critic_scores),
+                                   na.rm = T), silent = T)
+      film$critics_med <- try(median(numlist(film$rating$critic_scores),
+                                     na.rm = T), silent = T)
+      if (class(film$critics_avg)[1] == 'try-error' | 
+          !is.numeric(film$critics_avg)){
         film$critics_avg <- NA
       }
-      film$audience_avg <- try(as.numeric(film$rating$audience_avg), silent =T)
+      film$audience_avg <- try(as.numeric(film$rating$audience_avg),
+                               silent = T)
       if (class(film$audience_avg)[1] == 'try-error'){
         film$audience_avg <- NA
       }
-      film$critics_IQR <- try(IQR(numlist(film$rating$critic_scores)),silent = T)
+      film$critics_IQR <- try(IQR(numlist(film$rating$critic_scores)),
+                              silent = T)
       if (class(film$critics_IQR)[1] == 'try-error'){
         film$critics_IQR <- NA
       }
@@ -175,8 +184,10 @@ make_diag_name <- function(plt,df){
   diags <- which(plt$plots %like% 'Diag')
   for(i in 1:length(diags)){
     plt$plots[[diags[i]]] <- paste("ggally_text('",
-                                   str_wrap(gsub("_"," ",names(df)[i]), width = 8)
-                                   ,"', angle = 45, size = 3.5)",sep = '')
+                                   str_wrap(gsub("_", " " ,names(df)[i]),
+                                            width = 8)
+                                   ,"', angle = 45, size = 3.5)",
+                                   sep = '')
   }
   return(plt)
 }
