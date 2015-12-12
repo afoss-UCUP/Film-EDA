@@ -195,19 +195,17 @@ A couple thoughts:
 
 ## Potential Associated Measures
 
-Many data points are likely germane to measures of theater efficiency.  Obviously, for daily efficiency, I'll need to examine theater counts and weekly grosses. 
-
-See the proceeding charts for my thoughts.
+Many data points are likely germane to measures of theater efficiency. I try to oragnize them into meaningful groups, either by type or function, throughout the analysis.
 
 ### Descriptive Measures
 
-There are an additional handful of easy descriptive measures to look at. Seasonality is important in movie attendance, so I will look at week of year data. Similarly, genre, rating and runtime are simple, discriptive, and easy to examine.
+There are a handful of easy descriptive measures to look at. Seasonality is important in movie attendance, so I will look at week of year data. Similarly, genre, rating and runtime are simple, discriptive, and easy to examine.
 
 ```{r echo = FALSE, Descriptive_Metrics, fig.align = 'center', fig.width = 12, fig.height = 6, htmlcap = 'Fig. 2: Films by week of year, genre (limited to top 20), MPAA rating, and runtime.<br>With the exception of the week of year, these are all invariate by week, so unique films are plotted.'}
 
 #find range and plot week of year
 week_range <- get_chart_range(movie_df, 'week', 0, 1)
-p7 <- ggplot(aes(x = as.numeric(week)), data = movie_df[!is.na(week), ]) +
+p7 <- ggplot(aes(x = week), data = movie_df[!is.na(week), ]) +
   geom_bar(binwidth = 1, fill = 'navyblue') + 
   scale_x_discrete(breaks = seq(week_range[1],week_range[2], 5))
 
@@ -243,7 +241,7 @@ rm(p7, p8, p9, p10)
 A few quick observations are in order:
 
 * On the weekly chart, we see that weeks 1 and 53 have smaller counts of film weeks - this is likely due to the fact that in most years, these are partial weeks   
-* Again, on the weekly chart, we see that fewer film weeks are counted during late Spring / Summer (weeks 23 - 32) and late Fall (weeks 47 - 51).  These periods correspond with tent-pole/blockbuster picture releases and it may be that more theaters are occupied by a few large films. As evidence, a quick series of t-tests reveals that films in these periods tend to be larger both by theater counts and weekly grosses:
+* Again, on the weekly chart, we see that fewer film weeks are counted during late Spring/Summer (weeks 23 - 32) and late Fall (weeks 47 - 51).  These periods correspond with tent-pole/blockbuster picture releases and it may be that more theaters are occupied by a few large films. As evidence, a quick series of t-tests reveals that films in these periods tend to be larger both by theater counts and weekly grosses:
 
 ```{r echo = FALSE, tidy = TRUE}
 tentpoles <- c(23:32, 47:51)
@@ -275,7 +273,7 @@ t.test(tentpole_gross, non_tentpole_gross, alternative = 'greater')
 
 Other meaningful measures are a little harder to wrap one's head around.  Quality probably has something to do with film critic and audience assessments, but may also be related to dispersion of opinion (think of 'thought-provoking'/controversial films). Count of critic reviews may have something to do with the studio's estimation of the film's quality and its scale of release (e.g., do studios/distributors think it is a 'hit').
 
-```{r echo = FALSE, Quality_Critics, fig.width = 12, fig.height = 6, htmlcap = 'Fig. 3: Average critic score, count of Metacritic critic reviews, critic score interquartile range (.25 to .75), and audience score.<br>Again, unique by film.'}
+```{r echo = FALSE, Quality_Critics, fig.width = 12, fig.height = 6, htmlcap = 'Fig. 3: Average critic score, count of Metacritic critic reviews, critic score interquartile range (.75 - .25), and audience score.<br>Again, unique by film.'}
 
 # plot critics_avg scores from unique films
 critics_avg_dat <- unique_films(movie_df, 'critics_avg')
@@ -312,7 +310,9 @@ Again, some observations:
 
 ### Quality Measures - Cast
 
-Cast may also have a lot to do with quality and, hence, daily theater efficiency. I contrived a variety of metrics to determine quality through cast; these measures include the counts of the number of pictures that actors are in (it is reasonable to think that better actors may get invited to do more films) and measures of connectedness from the [igraph](http://igraph.org/r/) package - specifically degrees (a count of the connections of one actor node to others on a graph) and betweeness (a measure of how many paths between other actors pass through an actor's node on a graph). Note: the actor graph was developed using the full data set of `r length(movie_data)` unique titles.
+Cast may also have a lot to do with quality and, by extension, covary with daily theater efficiency. I contrived a variety of metrics to determine quality through cast.  I settled on counts of the number of pictures that actors are in (it is reasonable to think that better actors may get invited to do more films) and measures of connectedness from the [igraph](http://igraph.org/r/) package - specifically degrees (a count of the connections of one actor node to others on a graph) and betweeness (a measure of how many paths between other actors pass through an actor's node on a graph). 
+
+Note: the actor graph was developed using the full data set of `r length(movie_data)` unique titles.
 
 ```{r echo = FALSE, Quality_Cast, fig.width = 12, fig.height = 6, htmlcap = 'Fig. 4: Cumulative pictures by cast, cumulative degrees of cast, and betweeness of cast.<br>Once more, unique by film.'}
 
@@ -387,14 +387,14 @@ rm(p21, p22, p23)
 
 Thoughts on competition:
 
-* These variables are all pretty well behaved, though competitive box is has some skew
+* These variables are all pretty well behaved, though competitive box has some skew
 * There are some weeks with low counts early in the examined period, this is probably because films released prior to 11/2003 still occupied theaters for a couple months, but are absent from my statistics 
 
 # Bivariate Exploration
 
 ## The Single Most Important Factor: Novelty / Recency
 
-New releases are a big deal. It is pretty easy to see what I mean by plotting our key film metrics (weekly gross, weekly theaters, daily theater eff) by the relative week of a film's release. We'll see that the early weeks of a film's release dominate grosses and theater counts. Given what we learned about the shape of the distributions before, I show them all log transformed. I limit the images to the first ten weeks of release and plot the median and correlation so that we'll get a sense for the linear relationship. Relative week was omitted from univariate analysis as it would have been nonsensical.
+New releases are a big deal. It is pretty easy to see what I mean by plotting our key film metrics (weekly gross, weekly theaters, daily theater eff) by the relative week of a film's release. We'll see that the early weeks of a film's release dominate grosses and theater counts. I limit the images to the first ten weeks of release and plot the median and correlation so that we'll get a sense for the linear relationship. Relative week was omitted from univariate analysis as it would have been nonsensical.
 
 First, however, I want to find the most linear representation of my key features and relative week to plot.
 
@@ -482,7 +482,7 @@ rm(p24, p25, p26)
 
 Some observations:
 
-* Novelty is very important: all of these have a pretty strong linear relationship between time a film's been released and the variable
+* Novelty is very important: all of these have a pretty strong linear relationship between the elapsed time a film has been out and the variable
 * None of these relationships, even when log transformed, are perfectly linear (it is a complicated relationship, I have tried some other transforms on both x and y variables with only marginal improvement - these are not shown)
 * There is not much change between theater counts during the first and second weeks of a film's release. This is possibly an artifact of how distribution is contracted: distributors and theater chains typically have an agreement on the number of screens for the first two weeks of a film's release
 
@@ -490,7 +490,7 @@ Some observations:
 
 ### Box Office Seasonality
 
-I mentioned earlier on that seasonality measured by relative week of release would be important.  I provide my evidence in the following plots. I plot individual film weeks (top row) and the aggregates we calculated for our competitive measures (bottom). While we only have 12 years of data for the aggregates, there are some clear trends.
+I mentioned earlier on that seasonality measured by relative week of the year would be important.  I provide my evidence in the following plots. I plot individual film weeks (top row) and the aggregates we calculated for our competitive measures (bottom). While we only have 12 years of data for the aggregates, there are some clear trends.
 
 ```{r echo=FALSE, Seasonal_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 7: Weekly domestic box office, weekly theater counts and critic averages.<br>Individual films (top) and competitive aggregates (bottom) plotted by week of year. Green dot denotes an average, blue bar is median."}
 
@@ -735,15 +735,15 @@ rm(p39, p40, p41)
 
 Notes:
 
-* Certain genres are heavily dominated by specific ratings: Family Adventure is PG; Romance, Action / Adventure, Romantic Comedy and Sci-Fi Action are all heavily PG-13; Horror and Drama/Thriller are mostly R;
-* G-rated films are rare: Animation and Family Comedy are the only genres with any G-films
-* As I suspected, seasonal patterns exist in genre: Horror peaks in mid-Fall (to co-coincide with Halloween); Animation is strong in the Summer, but peaks in the family-friendly period around Thanksgiving; Dramas are few and far between during the Summer, then gradually increase up through award season in the Spring; Comedy is always common, but peaks in late-Summer and late-Spring (periods with low grosses and theater efficiency), potentially playing the role of 'filler' fare
+* Certain genres are heavily dominated by specific ratings: Family Adventure is PG; Romance, Action / Adventure, Romantic Comedy and Sci-Fi Action are all heavily PG-13; Horror and Drama/Thriller are mostly R
+* G-rated films are rare: Animation and Family Comedy are the only genres with any G-films of the genres I examined
+* As I suspected, seasonal patterns exist in genre: Horror peaks in mid-Fall (to coincide with Halloween); Animation is strong in the Summer, but peaks in the family-friendly period around Thanksgiving; Dramas are few and far between during the Summer, then gradually increase up through award season in the Spring; Comedy is always common, but peaks in late-Summer and late-Spring (periods with low grosses and theater efficiency), potentially playing the role of 'filler' fare
 * Ratings are seasonal, but less so: PG and G-rated films are out in low, constant levels; PG-13 is usually common (especially during late Summer), but has some share stolen by R-rated films going into Halloween
 * We only have limited data, so the seasonal inferences, while interesting, are likely not that statistically significant (n(years) = 12)
 
 ## Numeric Variables
 
-We have a large number of additional variables remaining.  These are all numeric and can be divided into two categories: those that vary by film (e.g., they are unique on a per film basis) and those that vary by film-week (the remaining competitive measures).  
+We have a large number of additional variables remaining.  These are all numeric and can be divided into two categories: those that vary by film-week (the competitive measures) and those that vary by film (e.g., they are unique on a per film basis).  
 
 ### Film-Week Variables
 
@@ -862,7 +862,7 @@ Some interesting observations:
 * The cast variables (cumulative pictures, cumulative degrees, cumulative betweeness) are highly correlated in all forms (standard and log transformed). 
 * All cast variables probably measure roughly the same thing since a major driver of all of them is the number of films an actor has been in.  For brevity and model stability, I will only use cumulative pictures in the remaining analysis
 * Runtime and counts of critics have the best linear relationship with my key metrics
-* Interesting to see that runtime and critic averages are positively correlated (why would critics like long movies?)
+* It is interesting to see that runtime and critic averages are positively correlated (why would critics like long movies?)
 * Also interesting to see that critic counts and critic averages are positively correlated (is this because critics want to review good films, because producers invite critics to review better films, or some issue with the Metacritic collection?)
 * Metacritic's audience opinion doesn't seem to matter as much as critic opinion - maybe this is because Metacritic reviewers are an unusual sample of movie-goers
 * Dispersion in critic opinion (critic IQR) is not strongly related to much of anything. However, it may absorb variance in a model when combined with other factors, so I'll leave it for now
@@ -871,9 +871,9 @@ Some interesting observations:
 
 ## Release Lifecycle: Understanding the Business
 
-In terms of business importance, understanding what differentiates the best films (according to our key metrics) from the rest is of huge interest.  Given the influence of novelty (the relative week of release), it also makes sense to continue examining our key metrics along those lines.  The following section makes use of multivariate analysis to try to tease out the differences in life-cycle among films. 
+In terms of business importance, understanding what differentiates the best films (according to our key metrics) from the rest is of huge interest.  Given the influence of novelty (the relative week of release), it also makes sense to continue examining our key metrics along that line.  The following section makes use of multivariate analysis to try to tease out the differences in life-cycle among films. 
 
-I first look to the differences observed in film life-cycle if we had 'perfect foresight' into how big a domestic box office success a film became. 
+I first look to the differences observed in film life-cycle if we had 'perfect foresight' into how big a domestic box office success a film will become. 
 
 ### Perfect Foresight 
 
@@ -929,9 +929,9 @@ Notes on perfect foresight life-cycle:
 * I am immediately struck by the high degree of path dependency - we can see that, for each tier, results stay separated from one another over the 10 week horizon I inspect (the quantile lines show that inference is pretty statistically robust)
 * Again, we can see the impact of those first two week contracts - theaters stay relatively flat, but efficiency falls dramatically for the worst films (they're probably playing to empty seats)
 * The best and worst films stay that way according to efficiency measures - that is weird and suggests, again, that theater owners cannot, for some reason, taker a theater playing a bad film and swap it for a good film (which would remove dispersion in efficiency over time). 
-* The lack of convergence in efficiency could be due to an oversupply of screens and theaters - all categories of movies may typically play to theaters with many empty seats, but the better movies just are less empty (unfortunately I can't check that in my data).  General oversupply could be the rational result of a hit driven business and seasonality (both things we've already established)
+* The lack of convergence in efficiency could be due to an oversupply of screens and theaters - all categories of movies may typically play to theaters with many empty seats, but the better movies play to more full theaters (unfortunately I can't check that in my data).  General oversupply could be the rational result of a hit driven business and seasonality (both things we've already established)
 
-A high degree of path dependency means that it would be helpful to know which films are likely to be 'good'.  That way, more resources (marketing, theaters, etc.) can be devoted to them. I look next at some tiered variables that could allow us to make some inference about total gross.  
+A high degree of path dependency means that it would be helpful to know which films are likely to be 'good'.  That way, more resources (marketing, theaters, etc.) can be devoted to them. I look next at some tiered variables that could allow us to make some inference about how much of a hit a film will be.
 
 First up: strength of the open (tiered based on first week gross).
 
@@ -991,7 +991,7 @@ Next up: Critical acclaim.
 
 ### Critical Acclaim
 
-I'll next tier films by critic average ratings. We're using critic scores as a proxy for quality and we know these are correlated in a bi-variate analysis. Critic reviews are, again, something that can be used in real-time to make decisions about allocating resources to a release.  Hopefully, we'll see evidence of path dependence that would help us determine which films are the best by ultimate gross. We may also see evidence of other categories of 'special' films.
+I'll next tier films by critic average ratings. We're using critic scores as a proxy for quality and we know these are correlated in a bivariate analysis. Critic reviews are, again, something that can be used in real-time to make decisions about allocating resources to a release.  Hopefully, we'll see evidence of path dependence that would help us determine which films are the best to show. We may also see evidence of other categories of 'special' films.
 
 ```{r echo=FALSE, Critic_Tier_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 14: Key metrics by relative week of release. Colors represent critical acclaim tier.<br>Median lines are solid, .25 and .75 quantile lines are dashed."}
 
@@ -1058,13 +1058,13 @@ rm(p53)
 
 ```
 
-Plotting using the bar chart allows me to check the relative incidence of opening tier among different critical tiers. Using a bi-variate box plot of critic tier and opening, I would have missed the fact that the top rated films are driven by extremes at both ends.  Certainly, top rated films contain more sleeper hits, but critics also seem to disproportionately love huge releases, too. So the answer is: critical darlings and sleeper hits are kinda, but not really, the same.
+Plotting using the bar chart allows me to check the relative incidence of opening tier among different critical tiers. Using a bi-variate box plot of critic tier and opening, I would have missed the fact that the top rated films are driven by extremes at both ends (at the proportional expense of mid-range openers).  Certainly, top rated films contain more sleeper hits, but critics also seem to disproportionately love huge releases. So the answer is: critical darlings and sleeper hits are partially, but not really, the same.
 
-We also considered cast / talent to be a proxy for quality.  Cast is up next.
+We also considered cast/talent to be a proxy for quality, which I tackle next.
 
 ### Casting Call
 
-Here I tier films by the cumulative pictures the cast has been in (we dropped the other measures as they're effectively the same thing). Again, we're looking for a relationship that could help us determine the best films so we can appropriately allocate resources.  Our cast variable has a bit of a problem, which is a product of construction; it is an aggregate over the entire 2003-2015 period, likely creating a look-ahead bias.  The look-ahead mechanism would work as follows: producers attribute film performance to the cast, so actors in historically good films get asked to appear in more 'good' future films, creating a virtuous cycle.
+Here I tier films by the cumulative pictures the cast has been in (we dropped the other measures as they're effectively the same thing). Again, we're looking for a relationship that could help us determine the best films so we can appropriately allocate resources.  Our cast variable has a bit of a problem, which is a product of construction; it is an aggregate over the entire 2003-2015 period, likely creating a look-ahead bias.  The look-ahead mechanism would work as follows: producers attribute film performance to the cast, so actors in historically good films get asked to appear in more 'good' future films, creating a self-reinforcing cycle.
 
 ```{r echo=FALSE, Cast_Tier_Plots, fig.width = 12, fig.height = 6, htmlcap = "Fig. 15: Key metrics by relative week of release. Colors represent tiers of cumulative pictures done by the cast.<br>Median lines are solid, .25 and .75 quantile lines are dashed."}
 
@@ -1110,7 +1110,7 @@ rm(p54, p55, p56)
 Comments on casting and performance:
 
 * Cast derived measures have the most monotonic relationship with our perfect foresight measures (certainly for the top 5% in cast)
-* Causality is hard to tease out, but given the fact that we can tell a simple compelling (though untested) story and already know our talent measure has look-ahead bias, I'd be surprised if we did not see a fairly stable, monotonic relationship
+* Causality is hard to tease out, but given the fact that we can tell a simple, compelling (though untested) story and already know our talent measure has look-ahead bias, I'd be surprised if we did not see a fairly stable, monotonic relationship
 
 You may be wondering how different our cast and critic quality metrics are from one another.  It is easy to imagine that there is one common factor driving cast, critic score and gross (some single 'awesomeness' factor). Here is a simple chart that provides a partial answer.
 
@@ -1134,7 +1134,7 @@ p57
 rm(p57)
 ```
 
-Looking at the above, I notice that the relationship with gross is fairly (though not perfectly) monotonic across casting tier and across critic tier.  If cast tier and critic tier captured the same exact information about gross, we would not observe monotonicity with gross along both dimensions. Clearly, the measures examined here are different (though this does not preclude a better representation using some latent factor...work for another time).
+Looking at the above, I notice that the relationship with gross is fairly (though not perfectly) monotonic across casting tier and across critic tier.  If cast tier and critic tier captured the same exact information about gross, this type of double-sort should not show monotonicity with gross along both dimensions. Clearly, the measures examined here are different (though this does not preclude a better representation using some latent factor...work for another time).
 
 ### Seasonality and Competition
 
@@ -1221,18 +1221,18 @@ rm(p58, p59)
 Quick thoughts on seasonality and competition:
 
 * We've seen that seasonality matters and we see it here again; the Spring and Fall see lower weekly grosses than the Summer (definitely) and Winter (slightly)
-* Competition for theaters (chosen because it had the strongest bi-variate relationship) is a little strange: close to monotonic in all seasons by the fourth week of release, but during the first week of release in Winter it behaves a little perversely (more competition should be bad and Winter matters as it is prime movie season) 
+* Competition for theaters (chosen because it had the strongest bi-variate relationship) is a little strange: close to monotonic in all seasons by the fourth week of release, but during the first week of release in Winter it behaves a little perversely (more competition should be bad) 
 
 ## Modeling with Selected Variables
 
-What follows is some cursory modeling of daily theater efficiency. I chose this variable as it probably has the most meaning from a business perspective and touches on items like resource allocation.
+What follows is some cursory modeling of daily theater efficiency. I chose this variable as it probably has the most meaning from a business perspective and touches on current resource allocation.
 
 These models build upon one another and look solely at the items examined in the document.  
 
 1. I first model log10 daily theater efficiency against log10 relative week.
-2. Next, I add my descriptive variables season (rather than week of year), genre (limited to top twenty by film count), MPAA Rating and runtime
-3. Quality variables including counts of critics, critic averages, audience averages, critic opinion dispersion (IQR) and cumulative cast films (we dropped the other talent measures)
-4. The final model adds competition in weekly gross, weekly critic opinions and weekly theaters 
+2. Next, I add my descriptive variables: season (rather than week of year), genre (limited to top twenty by film count), MPAA Rating and runtime
+3. The quality model variables include: counts of critics, critic averages, audience averages, critic opinion dispersion (IQR) and cumulative films by the cast (we dropped the other talent measures)
+4. The final model adds competition to the mix and includes: competitive weekly gross, weekly critic opinions and weekly theaters 
 
 ```{r echo = FALSE}
 # novelty
@@ -1263,25 +1263,25 @@ mtable(m1, m2, m3, m4)
 
 ```
 
-Thoughts on a linear approximation:
+Thoughts on our linear approximation:
 
 * It is fairly obvious that the novelty of a movie is a huge driver of efficiency. That first model explains 38.5% of the variance.  
-* Adding our descriptive features boosts that to 50.1% of the variance explained.  The seasons are all important (Fall is the worst and the baseline). Many genres are important, too (though they look bad stacked against animation). Ratings, with the exception of R (which is worse than G), don't have much meaning. Runtime is important - I have no good theory as to why
-* Quality is meaningful and boosts our model to 58.9% of variance explained.  With the exception of audience averages (which flipped sign from their bi-variate correlation in the presence of other measures), all of these work as you'd expect.  Interestingly, the introduction of quality measures flips the coefficient of R ratings
-* Competitive variables add an additional 2.5% to explanatory power, bringing the model to 60.4% of variance explained.  Competition in theaters is a net negative, but competition in gross (maybe due to season?) is positive as it was in our bi-variate analysis.  Competition in quality (critic scores) doesn't seem to matter, at least the way that variable was constructed
+* Adding our descriptive features boosts that to 50.1% of variance explained.  The seasons are all important (Fall is the worst and the baseline). Many genres are important, too (though they look bad stacked against animation). Ratings, with the exception of R (which is worse than G), don't have much meaning. Runtime is important - I have no good theory as to why
+* Quality is meaningful and boosts our model to 58.9% of variance explained.  With the exception of audience averages (which flipped sign from their bivariate correlation in the presence of other measures), all of these work as you'd expect.  Interestingly, the introduction of quality measures flips the coefficient of R-ratings
+* Competitive variables add an additional 2.5% to explanatory power, bringing the model to 60.4% of variance explained.  Competition in theaters is a net negative, but competition in gross (maybe due to season?) is positive as it was in our bivariate analysis.  Competition in quality (critic scores) doesn't seem to matter, at least the way that variable was constructed
 
 Issues:
 
-* The biggest shortcoming of the model is that the data is really non-linear.  One could do a much better job with more complex transforms or a non-linear modeling approach like trees. 
-* We could also get more and better data (I have a bunch of other factors we didn't use). Additionally, I constrained the data to cases we examined previously, which threw away numerous observations. 
-* We didn't scale or center our variables, which makes the relative importance hard to assess.  
+* The biggest shortcoming of the model is that the data is really non-linear.  One could do a much better job with more complex transforms or a non-linear modeling approach like trees
+* We could also get more and better data (I have a bunch of other factors we didn't use). Additionally, I constrained the data to cases we examined previously, which threw away numerous observations
+* We didn't scale or center our variables, which makes the relative importance hard to assess
 * Checking the residuals (plot not shown) shows that there are some problems with fit in the tails and several outliers that have leverage - addressing these items would improve my faith in the significance of the results.  
 
 ------
 
 # Final Plots and Takeaway (Three Key Ideas Section)
 
-At the outset, I decided to approach this analysis from a business perspective as a theater owner. So, my summary points are provide my perspective on how to approach the problem of maximizing theater profitability (most directly related to the theater efficiency measure).
+At the outset, I decided to approach this analysis from a business perspective as a theater owner. So, my summary points provide my perspective on how to approach the problem of maximizing theater profitability (most directly related to the theater efficiency measure).
 
 ## A Story of Path Dependency
 
@@ -1329,9 +1329,9 @@ Three weeks is a long time in the movie business (we've seen how important the r
 
 What this means is that a theater owner should favor one of these extreme efficiency performers (a good marker for a top 5% gross tier film) early and at every point along the way when considering swapping out older films.  He/she may even rationally favor these films over new releases.
 
-I've puzzled over the fact that the film tiers don't really converge in efficiency.  I've offered a couple stories: seasonality or rarity could introduce a temporal barrier to executing these swaps between films, but I think general overcapacity is a more likely story. I can't prove it as I don't have seat/theater utilization data, but overcapacity would manifest as non-convergence if all tiers of films often played to theaters with spare seats. General overcapacity would be a pretty rational response in an industry with fixed assets and where demand peaks and troughs (weekends, seasonally and with hits). 
+I've puzzled over the fact that the film tiers don't really converge in efficiency.  I've offered a couple stories so far: seasonality or rarity could introduce a temporal barrier to executing these swaps between films, but I think general overcapacity is a more likely story. I can't prove it as I don't have seat/theater utilization data, but overcapacity would manifest as non-convergence if all tiers of films often played to theaters with spare seats. Again, general overcapacity would be a pretty rational strategy in an industry with fixed assets and where demand peaks and troughs (weekends, seasonally and with hits). 
 
-I take additional evidence from the fact that theater owners otherwise seem to respond to supply/demand imbalances when scarcity appears to be at work. While not 'proof', I can't imagine they would respond to scarcity, but not overcapacity, all things equal.  The issue is that excess capacity can't be taken off line easily, so we really never observe convergence in efficiency.  
+I take additional evidence from the fact that theater owners otherwise respond to economic signals.  They appear to respond to supply/demand imbalances when scarcity is the culprit. While not 'proof', I can't imagine they would respond to scarcity, but not overcapacity, all else equal.  The issue is that excess capacity is pretty static and can't be taken off line easily, so we really never observe convergence in efficiency.  
 
 ## Towards Greater Theater Efficiency
 
@@ -1382,7 +1382,7 @@ Finally, when considering theater efficiency, we saw that seasonality and timing
 
 I feel like I've said it a lot by now, but seasonality is important to theater profitability.  As is competition. In the following charts, I again give a quick take on the first four weeks after release for films in different seasons and with different levels of competition from other films. 
 
-```{r echo=FALSE, Plot_Three, fig.width = 12, fig.height = 6, htmlcap = "Fig. 20: From top left to bottom right we get the flip-book version of the first four weeks of a film's release.<br>Efficiency is measured by Season and Competion in Theaters."}
+```{r echo=FALSE, Plot_Three, fig.width = 12, fig.height = 6, htmlcap = "Fig. 20: Another top left to bottom right flip-book of the first four weeks of a film's release.<br>Efficiency is measured by Season and Competion in Theaters."}
 
 p62 <- ggplot(aes(fill = comp_tier,
                   x = season,
@@ -1399,7 +1399,7 @@ p62 <- ggplot(aes(fill = comp_tier,
   scale_y_log10(labels = dollar, breaks = seq(500,10000,2000)) +
   facet_wrap(~ r_week) +
   scale_fill_brewer(type = 'seq', palette = 'Spectral') +
-  ggtitle("Timing's Not Everything, But It Is Still a Thing") + 
+  ggtitle("Timing's Not Everything, but It Is Still a Thing") + 
   labs(y = expression(paste(log[10], ' Daily Theater Efficiency', sep = '')),
        x = 'Season',
        fill = 'Competitor Theaters',
@@ -1415,13 +1415,13 @@ rm(p62)
 
 As we've seen before, Fall is the worst period for efficiency, Spring is slightly better, Winter is usually pretty good and Summer is both good and subject to extreme highs. In most instances, a fairly monotonic relationship is visible within a season (Fall and Spring may get thrown off by the fact that there are few blockbusters saturating many screens per theater during those periods, so relative competition from other titles stays high).  At any rate, it is generally the case that a film's efficiency is highest when competition is light and worse when it is heavy.  This pattern is especially pronounced in the first week of release in the Summer when a couple blockbusters may dominate revenues giving efficiency a wide range. Keep in mind the log axis - the differences on a per theater basis are substantial.
 
-But a theoretical theater owner really can't do much about these variables - he/she can only make the most optimal decision for what to show at a given point in time, so why do these variables bear consideration? Well, one would absolutely to consider the this volatility when thinking about long-horizon profitability or cash flow. Simply knowing that there is substantial variation by season and due to competition can help 'right-size' an operation. One can ask, 'am I willing to give up profitability in September in exchange for capacity in extreme periods where a blockbuster dominates the Summer schedule?' or 'What is the likelihood a huge peak or trough occurs?'  The ability to think about those questions will help guide the theater owner to the solutions for more purely operational problems.
+But a theoretical theater owner really can't do much about these variables - he/she can only make the most optimal decision for what to show at a given point in time, so why do these variables bear consideration? Well, one would absolutely want to consider the this volatility when thinking about long-horizon profitability or cash flow. Simply knowing that there is substantial variation by season and due to competition can help 'right-size' an operation. One can ask, 'am I willing to give up profitability in September in exchange for capacity in extreme periods where a blockbuster dominates the Summer schedule?' or 'what is the likelihood a huge peak or trough occurs?'.  The ability to think about those questions will help guide the theater owner to the solutions for more purely operational problems.
 
 ------
 
 # Reflection
 
-I think I satisfied my basic motivations in writing this piece.  I set out to engage a broad and interesting topic in a fashion narrow enough that I could provide insightful analysis.  I hope I succeeded.  Throughout, treating this as a business problem allowed me to make quick decisions on what to include or exclude from consideration - in every case, to be included, there had to be a straightforward economic question to examine.  
+I set out to engage a broad and interesting topic in a fashion narrow enough that I could provide insightful analysis.  I hope I succeeded.  Throughout, treating this as a business problem allowed me to make quick decisions on what to include or exclude from consideration - in every case, to be included, there had to be a straightforward economic question to examine.  
 
 Data collection was obviously the biggest challenge here and far more work than I intended. The sites I used did not have APIs. Scraping the web is not always easy and requires a lot of site specific coding. Names are not shared across different sites, so energy is spent translating and matching. Certain sites place limits on the numbers of queries you can send, making it impossible to speed through data collection. Frankly, the whole ETL process is really tedious and takes 50-100% longer than I expected. 
 
