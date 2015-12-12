@@ -29,7 +29,7 @@ Other R-related
 http://www.personality-project.org/r/html/misc.html
 http://igraph.org/r/
 http://stackoverflow.com/questions/10602433/how-to-escape-a-question-mark-in-r
-
+http://adv-r.had.co.nz/Style.html
 Idea Generation & Requirements
 https://s3.amazonaws.com/udacity-hosted-downloads/ud651/GeographyOfAmericanMusic.html
 https://s3.amazonaws.com/udacity-hosted-downloads/ud651/AtlanticHurricaneTracking.html
